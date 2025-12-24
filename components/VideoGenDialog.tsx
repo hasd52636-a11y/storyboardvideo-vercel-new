@@ -24,6 +24,7 @@ export default function VideoGenDialog({
   symbolDescriptions = {}
 }: VideoGenDialogProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [customPrompt, setCustomPrompt] = useState('');
   const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2-pro');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [duration, setDuration] = useState(10);
@@ -59,7 +60,8 @@ export default function VideoGenDialog({
   const finalPrompt = buildStructuredPrompt();
 
   const handleGenerate = async () => {
-    const promptToUse = selectedFrames.length > 0 ? finalPrompt : prompt;
+    // 如果有自定义提示词，使用自定义的；否则使用自动生成的或手动输入的
+    const promptToUse = customPrompt.trim() || (selectedFrames.length > 0 ? finalPrompt : prompt);
 
     if (!promptToUse.trim()) {
       alert(lang === 'zh' ? '请输入视频提示词' : 'Please enter video prompt');
@@ -118,10 +120,9 @@ export default function VideoGenDialog({
             {lang === 'zh' ? '视频提示词' : 'Video Prompt'}
           </label>
           <textarea
-            value={selectedFrames.length > 0 ? finalPrompt : prompt}
-            onChange={(e) => selectedFrames.length === 0 && setPrompt(e.target.value.slice(0, 760))}
+            value={customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)}
+            onChange={(e) => setCustomPrompt(e.target.value.slice(0, 760))}
             placeholder={lang === 'zh' ? '描述你想要生成的视频内容...' : 'Describe the video content you want to generate...'}
-            readOnly={selectedFrames.length > 0}
             style={{
               width: '100%',
               height: '100px',
@@ -131,13 +132,13 @@ export default function VideoGenDialog({
               fontSize: '14px',
               boxSizing: 'border-box',
               fontFamily: 'Arial, sans-serif',
-              backgroundColor: selectedFrames.length > 0 ? '#f5f5f5' : '#fff',
-              cursor: selectedFrames.length > 0 ? 'not-allowed' : 'text'
+              backgroundColor: '#fff',
+              cursor: 'text'
             }}
           />
-          <div style={{ marginTop: '4px', fontSize: '12px', color: (selectedFrames.length > 0 ? finalPrompt : prompt).length > 700 ? '#ff6b6b' : '#999' }}>
-            {(selectedFrames.length > 0 ? finalPrompt : prompt).length} / 760
-            {selectedFrames.length > 0 && <span style={{ marginLeft: '10px', color: '#666' }}>({lang === 'zh' ? '自动生成' : 'Auto-generated'})</span>}
+          <div style={{ marginTop: '4px', fontSize: '12px', color: (customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)).length > 700 ? '#ff6b6b' : '#999' }}>
+            {(customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)).length} / 760
+            {selectedFrames.length > 0 && !customPrompt && <span style={{ marginLeft: '10px', color: '#666' }}>({lang === 'zh' ? '自动生成' : 'Auto-generated'})</span>}
           </div>
         </div>
 

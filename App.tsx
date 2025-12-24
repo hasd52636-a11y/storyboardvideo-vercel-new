@@ -760,13 +760,10 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
     let failureCount = 0;
     
     try {
-      // 并发处理：最多同时处理 2 张（避免 API 限流）
-      const MAX_CONCURRENT = 2;
-      const queue = [...orderedFrames];
-      let processing = 0;
-      
-      const processFrame = async (frame: StoryboardItem, index: number) => {
-        const sceneNum = `SC-${String(index + 1).padStart(2, '0')}`;
+      // 顺序处理队列（一次一张，避免 API 限流）
+      for (let i = 0; i < orderedFrames.length; i++) {
+        const frame = orderedFrames[i];
+        const sceneNum = `SC-${String(i + 1).padStart(2, '0')}`;
         const instruction = instructions[sceneNum] || '';
         
         // 组合提示词：原始提示词 + 用户指令 + 符号信息
@@ -786,7 +783,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         // 生成新图片
         const isBlackAndWhite = frame.colorMode === 'blackAndWhite';
         try {
-          console.log(`[${sceneNum}] 开始生成...`);
+          console.log(`[${sceneNum}] 开始生成... (${i + 1}/${orderedFrames.length})`);
           const newUrl = await generateSceneImage(finalPrompt, true, isBlackAndWhite, undefined, frame.aspectRatio);
           if (newUrl) {
             setItems(prev => prev.map(it => it.id === frame.id ? { ...it, imageUrl: newUrl, filter: FilterMode.LINE_ART, prompt: finalPrompt } : it));
@@ -800,33 +797,12 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           failureCount++;
           console.error(`[${sceneNum}] ✗ 生成错误:`, frameError);
         }
-      };
-      
-      // 并发队列处理
-      const processQueue = async () => {
-        while (queue.length > 0 && processing < MAX_CONCURRENT) {
-          processing++;
-          const frame = queue.shift();
-          const frameIndex = orderedFrames.indexOf(frame!);
-          
-          processFrame(frame!, frameIndex).finally(() => {
-            processing--;
-            processQueue(); // 继续处理下一个
-          });
-        }
-      };
-      
-      // 启动并发处理
-      await new Promise<void>((resolve) => {
-        const checkComplete = setInterval(() => {
-          if (queue.length === 0 && processing === 0) {
-            clearInterval(checkComplete);
-            resolve();
-          }
-        }, 100);
         
-        processQueue();
-      });
+        // 每张之间添加 500ms 延迟，进一步避免 API 限流
+        if (i < orderedFrames.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
       
       // 显示结果提示
       if (failureCount > 0) {

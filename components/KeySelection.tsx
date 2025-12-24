@@ -69,6 +69,8 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
   const [testStatus, setTestStatus] = useState<{ llm?: 'idle' | 'loading' | 'success' | 'failed'; image?: 'idle' | 'loading' | 'success' | 'failed' }>({});
   const [videoTestStatus, setVideoTestStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
   const [showHelp, setShowHelp] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showVideoApiKey, setShowVideoApiKey] = useState(false);
 
   const t = I18N[selectedLang];
 
@@ -173,7 +175,7 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
         </div>
 
         {/* 语言和主题设置 */}
-        <div className={`grid grid-cols-2 gap-8 mb-10 pb-10 border-b ${theme === 'dark' ? 'border-white/10' : 'border-zinc-200'}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 pb-10 border-b ${theme === 'dark' ? 'border-white/10' : 'border-zinc-200'}`}>
           <div className="space-y-4">
             <label className="block text-[10px] font-black uppercase tracking-[0.2em] opacity-50">{t.language}</label>
             <div className="flex gap-3">
@@ -206,7 +208,7 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
         </div>
 
         {/* 标签页切换 */}
-        <div className={`grid grid-cols-2 gap-4 mb-10 pb-10 border-b ${theme === 'dark' ? 'border-white/10' : 'border-zinc-200'}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 pb-10 border-b ${theme === 'dark' ? 'border-white/10' : 'border-zinc-200'}`}>
           <button
             onClick={() => setActiveTab('image')}
             className={`py-3 rounded-xl border font-black uppercase text-xs tracking-widest transition-all ${
@@ -231,10 +233,10 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
 
         {/* 图像 API 配置 */}
         {activeTab === 'image' && (
-          <div className="grid grid-cols-2 gap-8 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <div className="space-y-6">
               <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.provider}</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
                 {PROVIDERS.map(p => (
                   <button
                     key={p.id}
@@ -276,16 +278,50 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                 <div className="space-y-5 animate-in fade-in duration-300">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t.apiKey}</label>
-                    <input
-                      type="password"
-                      value={config.apiKey}
-                      onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                      placeholder="sk-..."
-                      className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-                    />
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? 'text' : 'password'}
+                        value={config.apiKey}
+                        onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                        placeholder="sk-..."
+                        className={`w-full rounded-xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className={`absolute right-4 top-1/2 -translate-y-1/2 text-lg transition-opacity hover:opacity-70 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}
+                        title={selectedLang === 'zh' ? (showApiKey ? '隐藏密钥' : '显示密钥') : (showApiKey ? 'Hide key' : 'Show key')}
+                      >
+                        {showApiKey ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t.baseUrl}</label>
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                      {t.baseUrl}
+                      {config.provider === 'zhipu' && (
+                        <a
+                          href="https://open.bigmodel.cn"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="智谱 AI 官网"
+                          className="inline-flex items-center justify-center w-4 h-4 bg-blue-500 text-white rounded-full text-[8px] font-bold hover:bg-blue-600 transition-colors"
+                        >
+                          ?
+                        </a>
+                      )}
+                      {config.provider === 'openai' && (
+                        <a
+                          href="https://platform.openai.com/account/api-keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="OpenAI API 密钥"
+                          className="inline-flex items-center justify-center w-4 h-4 bg-green-500 text-white rounded-full text-[8px] font-bold hover:bg-green-600 transition-colors"
+                        >
+                          ?
+                        </a>
+                      )}
+                    </label>
                     <input
                       type="text"
                       value={config.baseUrl}
@@ -339,30 +375,8 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
         {activeTab === 'video' && (
           <div className="space-y-6 mb-10">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                {selectedLang === 'zh' ? '视频 API 说明' : 'Video API Instructions'}
-              </label>
-              <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-white/5 border border-white/10' : 'bg-zinc-50 border border-zinc-200'}`}>
-                <p className={`text-sm leading-relaxed ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                  {selectedLang === 'zh'
-                    ? '配置 Sora 2 视频生成 API。您可以从中转服务（如神马 API）获取 Base URL 和 API Key。'
-                    : 'Configure Sora 2 video generation API. You can get Base URL and API Key from relay services like Shenma API.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Base URL</label>
-              <div className="flex gap-2 items-end">
-                <input
-                  type="text"
-                  value={videoConfig.baseUrl}
-                  onChange={(e) => setVideoConfig({ ...videoConfig, baseUrl: e.target.value })}
-                  placeholder="https://api.xxx.com"
-                  className={`flex-1 rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${
-                    theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'
-                  }`}
-                />
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                Base URL
                 <div className="flex gap-2">
                   {VIDEO_API_PROVIDERS.map((provider) => (
                     <a
@@ -371,17 +385,26 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                       target="_blank"
                       rel="noopener noreferrer"
                       title={provider.description}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg transition-all hover:scale-110 ${
+                      className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8px] font-bold transition-all hover:scale-125 ${
                         theme === 'dark'
-                          ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20'
-                          : 'bg-zinc-100 border border-zinc-300 text-black hover:bg-zinc-200'
+                          ? 'bg-purple-500 text-white hover:bg-purple-600'
+                          : 'bg-purple-500 text-white hover:bg-purple-600'
                       }`}
                     >
                       🔗
                     </a>
                   ))}
                 </div>
-              </div>
+              </label>
+              <input
+                type="text"
+                value={videoConfig.baseUrl}
+                onChange={(e) => setVideoConfig({ ...videoConfig, baseUrl: e.target.value })}
+                placeholder="https://api.xxx.com"
+                className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${
+                  theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'
+                }`}
+              />
               <p className={`text-[10px] ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
                 {selectedLang === 'zh' ? '示例: https://api.xxx.com' : 'Example: https://api.xxx.com'}
               </p>
@@ -389,15 +412,25 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">API Key</label>
-              <input
-                type="password"
-                value={videoConfig.apiKey}
-                onChange={(e) => setVideoConfig({ ...videoConfig, apiKey: e.target.value })}
-                placeholder="sk-xxx..."
-                className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${
-                  theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'
-                }`}
-              />
+              <div className="relative">
+                <input
+                  type={showVideoApiKey ? 'text' : 'password'}
+                  value={videoConfig.apiKey}
+                  onChange={(e) => setVideoConfig({ ...videoConfig, apiKey: e.target.value })}
+                  placeholder="sk-xxx..."
+                  className={`w-full rounded-xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-purple-500/50 border ${
+                    theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowVideoApiKey(!showVideoApiKey)}
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 text-lg transition-opacity hover:opacity-70 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}
+                  title={selectedLang === 'zh' ? (showVideoApiKey ? '隐藏密钥' : '显示密钥') : (showVideoApiKey ? 'Hide key' : 'Show key')}
+                >
+                  {showVideoApiKey ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
               <p className={`text-[10px] ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
                 {selectedLang === 'zh' ? 'API 密钥将被保存在本地存储中' : 'API key will be saved in local storage'}
               </p>
@@ -424,19 +457,6 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                 ? (selectedLang === 'zh' ? '✗ 连接失败' : '✗ Failed')
                 : (selectedLang === 'zh' ? '测试连接' : 'Test Connection')}
             </button>
-
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-white/5 border border-white/10' : 'bg-zinc-50 border border-zinc-200'}`}>
-              <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                {selectedLang === 'zh' ? '如何获取 API 密钥？' : 'How to get API key?'}
-              </p>
-              <ol className={`text-[10px] leading-relaxed space-y-1 ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-600'}`}>
-                <li>1. {selectedLang === 'zh' ? '点击上方链接访问服务商网站' : 'Click the link above to visit the provider website'}</li>
-                <li>2. {selectedLang === 'zh' ? '注册账号并登录' : 'Register and log in'}</li>
-                <li>3. {selectedLang === 'zh' ? '在账户设置中获取 Base URL' : 'Get Base URL from account settings'}</li>
-                <li>4. {selectedLang === 'zh' ? '生成或复制你的 API Key' : 'Generate or copy your API Key'}</li>
-                <li>5. {selectedLang === 'zh' ? '粘贴到上面的输入框中' : 'Paste into the input field above'}</li>
-              </ol>
-            </div>
           </div>
         )}
 

@@ -13,6 +13,7 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
   const [apiKey, setApiKey] = useState(
     localStorage.getItem('sora_api_key') || ''
   );
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -87,8 +88,33 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
         </p>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold' }}>
             Base URL
+            <a
+              href="https://api.whatai.cc/login"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="查看 WhatAI API 文档"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                backgroundColor: '#4CAF50',
+                color: '#fff',
+                borderRadius: '50%',
+                textDecoration: 'none',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#45a049')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#4CAF50')}
+            >
+              ?
+            </a>
           </label>
           <input
             type="text"
@@ -105,7 +131,7 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
             }}
           />
           <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-            示例: https://api.xxx.com
+            示例: https://api.whatai.cc
           </p>
         </div>
 
@@ -113,20 +139,46 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
             API Key
           </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-xxx..."
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type={showApiKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-xxx..."
+              style={{
+                width: '100%',
+                padding: '10px',
+                paddingRight: '40px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '18px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#333')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
+              title={showApiKey ? '隐藏密钥' : '显示密钥'}
+            >
+              {showApiKey ? '👁️' : '👁️‍🗨️'}
+            </button>
+          </div>
           <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
             你的 API 密钥将被保存在本地存储中
           </p>
