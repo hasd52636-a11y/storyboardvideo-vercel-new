@@ -4,6 +4,7 @@ interface FrameData {
   id: string;
   prompt: string;
   symbols: Array<{ name: string }>;
+  order?: number;
 }
 
 interface VideoGenDialogProps {
@@ -13,6 +14,7 @@ interface VideoGenDialogProps {
   lang?: 'zh' | 'en';
   selectedFrames?: FrameData[];
   symbolDescriptions?: Record<string, Record<string, string>>;
+  optimizedPrompts?: { zh: string; en: string };
 }
 
 export default function VideoGenDialog({
@@ -21,7 +23,8 @@ export default function VideoGenDialog({
   initialPrompt = '',
   lang = 'zh',
   selectedFrames = [],
-  symbolDescriptions = {}
+  symbolDescriptions = {},
+  optimizedPrompts = { zh: '', en: '' }
 }: VideoGenDialogProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -35,8 +38,13 @@ export default function VideoGenDialog({
     setPrompt(initialPrompt);
   }, [initialPrompt]);
 
-  // Build structured prompt from selected frames
+  // Build structured prompt from selected frames or use optimized prompts
   const buildStructuredPrompt = () => {
+    // 优先使用优化后的提示词（来自 getOptimizedPrompts）
+    if (optimizedPrompts && optimizedPrompts[lang]) {
+      return optimizedPrompts[lang];
+    }
+    
     if (selectedFrames.length === 0) return prompt;
 
     const prompts = selectedFrames.map((frame, index) => {

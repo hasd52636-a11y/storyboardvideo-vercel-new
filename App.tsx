@@ -11,8 +11,6 @@ import VideoGenDialog from './components/VideoGenDialog';
 import VideoEditDialog from './components/VideoEditDialog';
 import VideoWindow from './components/VideoWindow';
 import HelpModal from './components/HelpModal';
-import AuthDialog from './components/AuthDialog';
-import AdminPanel from './components/AdminPanel';
 import VideoService from './videoService';
 
 interface HelpSection {
@@ -41,13 +39,6 @@ const App: React.FC = () => {
   const [currentStyle, setCurrentStyle] = useState<StyleOption | null>(null);
   const [currentAspectRatio, setCurrentAspectRatio] = useState<AspectRatio | null>(null);
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
-  
-  // Auth state
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userBalance, setUserBalance] = useState(0);
   
   // Video generation state
   const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
@@ -86,60 +77,6 @@ const App: React.FC = () => {
     localStorage.setItem('director_canvas_theme', newTheme);
   };
 
-  const handleLoginSuccess = (token: string, user: any) => {
-    setAuthToken(token);
-    setCurrentUser(user);
-    setUserBalance(user.balance);
-    localStorage.setItem('director_canvas_auth_token', token);
-    setShowAuthDialog(false);
-  };
-
-  const handleLogout = () => {
-    setAuthToken(null);
-    setCurrentUser(null);
-    setUserBalance(0);
-    localStorage.removeItem('director_canvas_auth_token');
-    setShowAuthDialog(true);
-  };
-
-  const deductBalance = async (amount: number, description: string) => {
-    if (!authToken) return false;
-    
-    try {
-      const response = await fetch('/api/user/deduct', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ amount, description })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserBalance(data.user.balance);
-        return true;
-      } else {
-        const error = await response.json();
-        alert(lang === 'zh' ? `余额不足: ${error.error}` : `Insufficient balance: ${error.error}`);
-        return false;
-      }
-    } catch (error) {
-      console.error('Failed to deduct balance:', error);
-      return false;
-    }
-  };
-
-  const checkBalance = (requiredAmount: number): boolean => {
-    if (userBalance < requiredAmount) {
-      alert(lang === 'zh' 
-        ? `余额不足。需要 ¥${requiredAmount}，当前余额 ¥${userBalance}` 
-        : `Insufficient balance. Required ¥${requiredAmount}, current balance ¥${userBalance}`);
-      return false;
-    }
-    return true;
-  };
-
   useEffect(() => {
     const checkKey = async () => {
       const saved = localStorage.getItem('director_canvas_api_config');
@@ -149,35 +86,6 @@ const App: React.FC = () => {
         setHasKey(await (window as any).aistudio.hasSelectedApiKey());
       } else {
         setHasKey(false);
-      }
-    };
-    
-    // 检查用户认证状态
-    const checkAuth = async () => {
-      const savedToken = localStorage.getItem('director_canvas_auth_token');
-      if (savedToken) {
-        setAuthToken(savedToken);
-        // 验证 token 并获取用户信息
-        try {
-          const response = await fetch('/api/user/profile', {
-            headers: { 'Authorization': `Bearer ${savedToken}` }
-          });
-          if (response.ok) {
-            const user = await response.json();
-            setCurrentUser(user);
-            setUserBalance(user.balance);
-          } else {
-            // Token 无效，清除
-            localStorage.removeItem('director_canvas_auth_token');
-            setShowAuthDialog(true);
-          }
-        } catch (error) {
-          console.error('Failed to verify auth token:', error);
-          setShowAuthDialog(true);
-        }
-      } else {
-        // 没有 token，显示登录对话框
-        setShowAuthDialog(true);
       }
     };
     
@@ -200,7 +108,6 @@ const App: React.FC = () => {
     }
     
     checkKey();
-    checkAuth();
   }, []);
 
   // 加载帮助内容
@@ -220,7 +127,7 @@ const App: React.FC = () => {
     loadHelpContent();
   }, [lang]);
 
-  // Keyboard Shortcuts (Ctrl+A and Delete)
+  // Keyboard Shortcuts (Ctrl+A, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 检查是否在输入框或文本区域中
@@ -251,11 +158,6 @@ const App: React.FC = () => {
 
   const handleGenerateFromScript = useCallback(async (scriptText: string, sceneCount: number, style?: any, aspectRatio?: string, duration?: number) => {
     if (!scriptText.trim()) return;
-    
-    // 检查余额（假设每个分镜 0.5 元）
-    const costPerScene = 0.5;
-    const totalCost = sceneCount * costPerScene;
-    if (!checkBalance(totalCost)) return;
     
     setIsLoading(true);
     try {
@@ -304,25 +206,15 @@ const App: React.FC = () => {
         }
       }
       setItems(prev => [...prev, ...newItems]);
-      
-      // 扣费
-      if (newItems.length > 0) {
-        await deductBalance(totalCost, `生成 ${newItems.length} 个分镜`);
-      }
     } catch (e) {
       console.error("Failed to generate from script", e);
     } finally {
       setIsLoading(false);
     }
-  }, [items.length, canvasOffset, globalColorMode, authToken, userBalance, lang]);
+  }, [items.length, canvasOffset, globalColorMode, lang]);
 
   const handleGenerateFromDialogue = useCallback(async (scenes: any[], frameCount: number, styleId: string, aspectRatio?: string, duration?: number) => {
     if (!scenes || scenes.length === 0) return;
-    
-    // 检查余额（假设每个分镜 0.5 元）
-    const costPerScene = 0.5;
-    const totalCost = frameCount * costPerScene;
-    if (!checkBalance(totalCost)) return;
     
     setIsLoading(true);
     try {
@@ -374,17 +266,12 @@ const App: React.FC = () => {
         }
       }
       setItems(prev => [...prev, ...newItems]);
-      
-      // 扣费
-      if (newItems.length > 0) {
-        await deductBalance(totalCost, `生成 ${newItems.length} 个分镜`);
-      }
     } catch (e) {
       console.error("Failed to generate from dialogue", e);
     } finally {
       setIsLoading(false);
     }
-  }, [items.length, canvasOffset, globalColorMode, authToken, userBalance, lang]);
+  }, [items.length, canvasOffset, globalColorMode, lang]);
 
   const handleAction = useCallback(async (id: string, action: string, data?: any) => {
     if (action === 'delete') {
@@ -395,9 +282,6 @@ const App: React.FC = () => {
     } else if (action === 'resize' && data) {
       setItems(prev => prev.map(it => it.id === id ? { ...it, width: data.width, height: data.height } : it));
     } else if (action === 'regenerate') {
-      // 检查余额（重新生成一个分镜 0.5 元）
-      if (!checkBalance(0.5)) return;
-      
       const target = items.find(it => it.id === id);
       if (!target) return;
       setIsLoading(true);
@@ -409,8 +293,6 @@ const App: React.FC = () => {
       const newUrl = await generateSceneImage(enrichedPrompt, true, isBlackAndWhite, undefined, target.aspectRatio);
       if (newUrl) {
         setItems(prev => prev.map(it => it.id === id ? { ...it, imageUrl: newUrl, filter: FilterMode.LINE_ART, prompt: promptToUse } : it));
-        // 扣费
-        await deductBalance(0.5, '重新生成分镜');
       }
       setIsLoading(false);
     } else if (action === 'copy') {
@@ -421,7 +303,7 @@ const App: React.FC = () => {
     } else if (action === 'setMain') {
       setItems(prev => prev.map(it => ({ ...it, isMain: it.id === id })));
     }
-  }, [items, lang, authToken, userBalance]);
+  }, [items, lang]);
 
   const getFormattedPrompts = useCallback(() => {
     if (selectedIds.size === 0) return "";
@@ -664,26 +546,47 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // 直接加载图片并绘制到导出 Canvas
-      const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number): Promise<boolean> => {
+      // CORS 代理列表
+      const CORS_PROXIES = [
+        'https://cors.bridged.cc/',
+        'https://api.allorigins.win/raw?url='
+      ];
+      
+      // 获取 CORS 代理 URL
+      const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
+        if (proxyIndex >= CORS_PROXIES.length) return url;
+        const proxy = CORS_PROXIES[proxyIndex];
+        if (proxy.includes('allorigins')) {
+          return `${proxy}${encodeURIComponent(url)}`;
+        }
+        return `${proxy}${url}`;
+      };
+      
+      // 直接加载图片并绘制到导出 Canvas（支持 CORS 代理）
+      const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number, proxyIndex: number = 0): Promise<boolean> => {
         return new Promise((resolve) => {
           const img = new Image();
           
           // 处理 CORS 问题：尝试多种方式加载图片
           if (!url.startsWith('data:')) {
-            // 首先尝试 anonymous CORS
             img.crossOrigin = "anonymous";
           }
           
           const timeout = setTimeout(() => {
             console.warn(`Image load timeout: ${url.substring(0, 50)}`);
-            resolve(false);
-          }, 25000);
+            // 尝试下一个代理
+            if (proxyIndex < CORS_PROXIES.length) {
+              const proxyUrl = getCorsProxyUrl(url, proxyIndex);
+              console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
+              loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+            } else {
+              resolve(false);
+            }
+          }, 15000);
           
           img.onload = () => {
             clearTimeout(timeout);
             try {
-              // 检查图片是否已加载
               if (img.width > 0 && img.height > 0) {
                 ctx.drawImage(img, x, y, w, h);
                 console.log(`✓ Image drawn successfully: ${url.substring(0, 50)}`);
@@ -693,8 +596,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
                 resolve(false);
               }
             } catch (e) {
-              console.error('Failed to draw image on canvas (CORS issue):', e);
-              // Canvas 被污染，但我们仍然继续（会在导出时处理）
+              console.error('Failed to draw image on canvas:', e);
               resolve(false);
             }
           };
@@ -702,30 +604,21 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           img.onerror = () => {
             clearTimeout(timeout);
             console.warn(`Image load failed: ${url.substring(0, 50)}`);
-            // 尝试不使用 CORS 重新加载（某些 CDN 可能不支持 CORS）
-            const fallbackImg = new Image();
-            fallbackImg.crossOrigin = null; // 移除 CORS 属性
             
-            fallbackImg.onload = () => {
-              try {
-                ctx.drawImage(fallbackImg, x, y, w, h);
-                console.log('✓ Fallback image drawn successfully (no CORS)');
-                resolve(true);
-              } catch (fallbackError) {
-                console.error('Fallback draw failed:', fallbackError);
-                resolve(false);
-              }
-            };
-            
-            fallbackImg.onerror = () => {
-              console.error('Fallback image load also failed');
+            // 尝试下一个代理
+            if (proxyIndex < CORS_PROXIES.length) {
+              const proxyUrl = getCorsProxyUrl(url, proxyIndex);
+              console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
+              loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+            } else {
+              // 所有代理都失败了，返回 false
               resolve(false);
-            };
-            
-            fallbackImg.src = url;
+            }
           };
           
-          img.src = url;
+          // 使用代理 URL 或原始 URL
+          const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+          img.src = loadUrl;
         });
       };
 
@@ -1040,24 +933,143 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
     try {
       setIsLoading(true);
       
+      // ✅ BUG FIX: 使用优化后的提示词格式（包含所有分镜信息）
+      const optimizedPrompts = getOptimizedPrompts();
+      const finalPrompt = lang === 'zh' ? optimizedPrompts.zh : optimizedPrompts.en;
+      
       // Get selected storyboard images
       const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
-      const images = selectedFrames.map(it => it.imageUrl);
+      
+      // ✅ BUG FIX: API 只支持单张图片，需要把多张分镜合成一张图片
+      let compositeImageUrl: string | undefined;
+      
+      if (selectedFrames.length > 0) {
+        // 合成多张分镜图为一张
+        const { parseAspectRatio } = await import('./types');
+        const frameRatio = selectedFrames[0]?.aspectRatio || '16:9';
+        const ratio = parseAspectRatio(frameRatio);
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          alert(lang === 'zh' ? '无法创建合成图' : 'Failed to create composite image');
+          setIsLoading(false);
+          return;
+        }
 
-      // Create video
-      const result = await videoServiceRef.current.createVideo(prompt, {
+        // 计算布局
+        const frameCount = selectedFrames.length;
+        let cols: number, rows: number, frameW: number, frameH: number;
+        const padding = 20;
+        
+        frameW = 400;
+        frameH = frameW / ratio;
+        
+        // 根据数量智能调整列数
+        if (frameCount <= 2) {
+          cols = frameCount;
+        } else if (frameCount <= 4) {
+          cols = 2;
+        } else if (frameCount <= 6) {
+          cols = 3;
+        } else {
+          cols = Math.ceil(Math.sqrt(frameCount));
+        }
+        rows = Math.ceil(frameCount / cols);
+        
+        canvas.width = frameW * cols + padding * (cols + 1);
+        canvas.height = frameH * rows + padding * (rows + 1);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // CORS 代理列表
+        const CORS_PROXIES = [
+          'https://cors.bridged.cc/',
+          'https://api.allorigins.win/raw?url='
+        ];
+        
+        const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
+          if (proxyIndex >= CORS_PROXIES.length) return url;
+          const proxy = CORS_PROXIES[proxyIndex];
+          if (proxy.includes('allorigins')) {
+            return `${proxy}${encodeURIComponent(url)}`;
+          }
+          return `${proxy}${url}`;
+        };
+        
+        const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number, proxyIndex: number = 0): Promise<boolean> => {
+          return new Promise((resolve) => {
+            const img = new Image();
+            if (!url.startsWith('data:')) {
+              img.crossOrigin = "anonymous";
+            }
+            
+            const timeout = setTimeout(() => {
+              if (proxyIndex < CORS_PROXIES.length) {
+                loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+              } else {
+                resolve(false);
+              }
+            }, 15000);
+            
+            img.onload = () => {
+              clearTimeout(timeout);
+              try {
+                if (img.width > 0 && img.height > 0) {
+                  ctx.drawImage(img, x, y, w, h);
+                  resolve(true);
+                } else {
+                  resolve(false);
+                }
+              } catch (e) {
+                resolve(false);
+              }
+            };
+            
+            img.onerror = () => {
+              clearTimeout(timeout);
+              if (proxyIndex < CORS_PROXIES.length) {
+                loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+              } else {
+                resolve(false);
+              }
+            };
+            
+            const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+            img.src = loadUrl;
+          });
+        };
+
+        // 绘制所有分镜图
+        for (let i = 0; i < selectedFrames.length; i++) {
+          const frame = selectedFrames[i];
+          const r = Math.floor(i / cols);
+          const c = i % cols;
+          const x = padding + c * (frameW + padding);
+          const y = padding + r * (frameH + padding);
+          
+          await loadAndDrawImage(frame.imageUrl, x, y, frameW, frameH);
+        }
+
+        // 转换为 base64 数据 URL
+        compositeImageUrl = canvas.toDataURL('image/jpeg', 0.9);
+      }
+
+      // Create video with composite image and optimized prompt
+      const result = await videoServiceRef.current.createVideo(finalPrompt, {
         model: options.model,
         aspect_ratio: options.aspect_ratio,
         duration: options.duration,
         hd: options.hd,
-        images: images.length > 0 ? images : undefined
+        images: compositeImageUrl ? [compositeImageUrl] : undefined
       });
 
       // Add video item to canvas
       const newVideoItem: VideoItem = {
         id: crypto.randomUUID(),
         taskId: result.task_id,
-        prompt,
+        prompt: finalPrompt,
         status: 'loading',
         progress: result.progress,
         x: 100,
@@ -1151,15 +1163,134 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
 
       // Get selected storyboard images
       const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
-      const images = selectedFrames.map(it => it.imageUrl);
+      
+      // ✅ BUG FIX: API 只支持单张图片，需要把多张分镜合成一张图片
+      let compositeImageUrl: string | undefined;
+      
+      if (selectedFrames.length > 0) {
+        // 合成多张分镜图为一张
+        const { parseAspectRatio } = await import('./types');
+        const frameRatio = selectedFrames[0]?.aspectRatio || '16:9';
+        const ratio = parseAspectRatio(frameRatio);
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          alert(lang === 'zh' ? '无法创建合成图' : 'Failed to create composite image');
+          setIsLoading(false);
+          return;
+        }
 
-      // Create new video with edited prompt
-      const result = await videoServiceRef.current.createVideo(newPrompt, {
+        // 计算布局
+        const frameCount = selectedFrames.length;
+        let cols: number, rows: number, frameW: number, frameH: number;
+        const padding = 20;
+        
+        frameW = 400;
+        frameH = frameW / ratio;
+        
+        // 根据数量智能调整列数
+        if (frameCount <= 2) {
+          cols = frameCount;
+        } else if (frameCount <= 4) {
+          cols = 2;
+        } else if (frameCount <= 6) {
+          cols = 3;
+        } else {
+          cols = Math.ceil(Math.sqrt(frameCount));
+        }
+        rows = Math.ceil(frameCount / cols);
+        
+        canvas.width = frameW * cols + padding * (cols + 1);
+        canvas.height = frameH * rows + padding * (rows + 1);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // CORS 代理列表
+        const CORS_PROXIES = [
+          'https://cors.bridged.cc/',
+          'https://api.allorigins.win/raw?url='
+        ];
+        
+        const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
+          if (proxyIndex >= CORS_PROXIES.length) return url;
+          const proxy = CORS_PROXIES[proxyIndex];
+          if (proxy.includes('allorigins')) {
+            return `${proxy}${encodeURIComponent(url)}`;
+          }
+          return `${proxy}${url}`;
+        };
+        
+        const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number, proxyIndex: number = 0): Promise<boolean> => {
+          return new Promise((resolve) => {
+            const img = new Image();
+            if (!url.startsWith('data:')) {
+              img.crossOrigin = "anonymous";
+            }
+            
+            const timeout = setTimeout(() => {
+              if (proxyIndex < CORS_PROXIES.length) {
+                loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+              } else {
+                resolve(false);
+              }
+            }, 15000);
+            
+            img.onload = () => {
+              clearTimeout(timeout);
+              try {
+                if (img.width > 0 && img.height > 0) {
+                  ctx.drawImage(img, x, y, w, h);
+                  resolve(true);
+                } else {
+                  resolve(false);
+                }
+              } catch (e) {
+                resolve(false);
+              }
+            };
+            
+            img.onerror = () => {
+              clearTimeout(timeout);
+              if (proxyIndex < CORS_PROXIES.length) {
+                loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
+              } else {
+                resolve(false);
+              }
+            };
+            
+            const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+            img.src = loadUrl;
+          });
+        };
+
+        // 绘制所有分镜图
+        for (let i = 0; i < selectedFrames.length; i++) {
+          const frame = selectedFrames[i];
+          const r = Math.floor(i / cols);
+          const c = i % cols;
+          const x = padding + c * (frameW + padding);
+          const y = padding + r * (frameH + padding);
+          
+          await loadAndDrawImage(frame.imageUrl, x, y, frameW, frameH);
+        }
+
+        // 转换为 base64 数据 URL
+        compositeImageUrl = canvas.toDataURL('image/jpeg', 0.9);
+      }
+
+      // ✅ BUG FIX: 使用优化后的提示词格式（包含所有分镜信息）
+      const optimizedPrompts = getOptimizedPrompts();
+      const finalPrompt = lang === 'zh' ? optimizedPrompts.zh : optimizedPrompts.en;
+
+      // Create new video with edited prompt and composite image
+      const result = await videoServiceRef.current.createVideo(finalPrompt, {
         model: 'sora-2-pro',
         aspect_ratio: '16:9',
         duration: 10,
         hd: false,
-        images: images.length > 0 ? images : undefined
+        images: compositeImageUrl ? [compositeImageUrl] : undefined
       });
 
       // Update video item with new task
@@ -1168,7 +1299,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           ? {
               ...item,
               taskId: result.task_id,
-              prompt: newPrompt,
+              prompt: finalPrompt,
               status: 'loading',
               progress: 0,
               videoUrl: undefined,
@@ -1442,46 +1573,6 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           </div>
         </div>
         
-        {/* User Info and Balance Display */}
-        <div className="flex items-center gap-4 pointer-events-auto">
-          {currentUser && (
-            <div className={`flex items-center gap-3 px-4 py-2 rounded-lg ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
-              <div className="flex flex-col items-end">
-                <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>
-                  {currentUser.username}
-                </span>
-                <span className="text-xs text-purple-500 font-bold">
-                  ¥{userBalance.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {currentUser && (
-            <>
-              <button
-                onClick={() => setShowAdminPanel(true)}
-                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
-                  theme === 'dark'
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-              >
-                {lang === 'zh' ? '管理' : 'Admin'}
-              </button>
-              <button
-                onClick={handleLogout}
-                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
-                  theme === 'dark'
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
-              >
-                {lang === 'zh' ? '登出' : 'Logout'}
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       <SidebarLeft theme={theme} lang={lang} activeTool={activeTool} setActiveTool={setActiveTool} onSettings={() => setShowSettings(true)} onImport={handleSidebarImport} zoom={zoom} onZoomChange={setZoom} onThemeChange={handleThemeChange} onLangChange={handleLangChange} colorMode={globalColorMode} onColorModeChange={setGlobalColorMode} />
@@ -1562,9 +1653,11 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           selectedFrames={items.filter(it => !it.isMain && selectedIds.has(it.id)).map(it => ({
             id: it.id,
             prompt: it.prompt,
-            symbols: it.symbols
+            symbols: it.symbols,
+            order: it.order
           }))}
           symbolDescriptions={SYMBOL_DESCRIPTIONS}
+          optimizedPrompts={getOptimizedPrompts()}
         />
       )}
 
@@ -1596,21 +1689,6 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       ))}
 
       {isLoading && <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 to-indigo-600 animate-[loading_2s_infinite] z-[100]" />}
-      
-      {/* Auth Dialog */}
-      {showAuthDialog && (
-        <AuthDialog
-          onClose={() => setShowAuthDialog(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      )}
-      
-      {/* Admin Panel */}
-      {showAdminPanel && (
-        <AdminPanel
-          onClose={() => setShowAdminPanel(false)}
-        />
-      )}
     </div>
   );
 };

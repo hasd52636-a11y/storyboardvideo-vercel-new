@@ -269,24 +269,32 @@ class VideoService {
     onProgress: (status: VideoStatus) => void,
     onComplete: (videoUrl: string) => void,
     onError: (error: Error) => void,
-    timeoutMs: number = 30 * 60 * 1000
+    timeoutMs: number = 60 * 60 * 1000  // 改为 60 分钟，支持多分镜视频
   ): void {
-    let pollInterval = 2000;
-    const maxInterval = 8000;
-    const backoffMultiplier = 2;
+    let pollInterval = 5000;  // 改为 5 秒，避免过于频繁的请求
+    const maxInterval = 30000;  // 改为 30 秒
+    const backoffMultiplier = 1.5;  // 改为 1.5，更平缓的增长
     const startTime = Date.now();
     let retryCount = 0;
 
     const poll = async () => {
       try {
         // 检查超时
+        const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
         if (Date.now() - startTime > timeoutMs) {
-          onError(new Error('Video generation timeout (exceeded 30 minutes)'));
+          onError(new Error(`Video generation timeout (exceeded ${timeoutMs / 60 / 1000} minutes)`));
           this.stopPolling(taskId);
           return;
         }
 
         const status = await this.getVideoStatus(taskId);
+        
+        // 添加详细日志
+        console.log(`[Video Polling] Task: ${taskId}`);
+        console.log(`  Status: ${status.status}`);
+        console.log(`  Progress: ${status.progress}`);
+        console.log(`  Elapsed: ${elapsedSeconds}s / ${timeoutMs / 1000}s`);
+        
         onProgress(status);
 
         if (status.status === 'SUCCESS') {

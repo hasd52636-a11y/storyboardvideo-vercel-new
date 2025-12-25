@@ -57,8 +57,33 @@ export const testApiConnection = async (config: ProviderConfig, type: 'llm' | 'i
   }
 };
 
+// CORS 代理列表（按优先级排序）
+const CORS_PROXIES = [
+  'https://cors.bridged.cc/',
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?'
+];
+
+// 获取 CORS 代理 URL
+const getCorsProxyUrl = (url: string, proxyIndex: number = 0): string => {
+  if (proxyIndex >= CORS_PROXIES.length) {
+    return url; // 如果所有代理都用完了，返回原始 URL
+  }
+  
+  const proxy = CORS_PROXIES[proxyIndex];
+  
+  // 不同的代理有不同的 URL 格式
+  if (proxy.includes('allorigins')) {
+    return `${proxy}${encodeURIComponent(url)}`;
+  } else if (proxy.includes('corsproxy')) {
+    return `${proxy}${encodeURIComponent(url)}`;
+  } else {
+    return `${proxy}${url}`;
+  }
+};
+
 // 将 URL 图片转换为 base64（使用 Canvas 方法绕过 CORS）
-const urlToBase64 = async (url: string): Promise<string | null> => {
+const urlToBase64 = async (url: string, proxyIndex: number = 0): Promise<string | null> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -84,7 +109,15 @@ const urlToBase64 = async (url: string): Promise<string | null> => {
     
     img.onerror = () => {
       console.error("Image load failed for URL:", url);
-      resolve(null);
+      
+      // 如果直接加载失败，尝试使用 CORS 代理
+      if (proxyIndex < CORS_PROXIES.length) {
+        console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
+        const proxyUrl = getCorsProxyUrl(url, proxyIndex);
+        urlToBase64(url, proxyIndex + 1).then(resolve);
+      } else {
+        resolve(null);
+      }
     };
     
     img.src = url;

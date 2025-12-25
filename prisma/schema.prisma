@@ -1,0 +1,41 @@
+// prisma/schema.prisma
+// Define your database models
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - matches your users table
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  balance   Float    @default(10)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+// Transaction model - matches your transactions table
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  type        String
+  amount      Float
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("transactions")
+}
