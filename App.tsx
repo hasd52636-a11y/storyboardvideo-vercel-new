@@ -571,46 +571,35 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
                 resolve(false);
               }
             } catch (e) {
-              console.error('Failed to draw image on canvas:', e);
-              // 尝试不使用 CORS 重新加载
-              const fallbackImg = new Image();
-              fallbackImg.onload = () => {
-                try {
-                  ctx.drawImage(fallbackImg, x, y, w, h);
-                  console.log('✓ Fallback image drawn successfully');
-                  resolve(true);
-                } catch (fallbackError) {
-                  console.error('Fallback also failed:', fallbackError);
-                  resolve(false);
-                }
-              };
-              fallbackImg.onerror = () => {
-                console.error('Fallback image load failed');
-                resolve(false);
-              };
-              fallbackImg.src = url;
+              console.error('Failed to draw image on canvas (CORS issue):', e);
+              // Canvas 被污染，但我们仍然继续（会在导出时处理）
+              resolve(false);
             }
           };
           
           img.onerror = () => {
             clearTimeout(timeout);
             console.warn(`Image load failed: ${url.substring(0, 50)}`);
-            // 尝试不使用 CORS 重新加载
+            // 尝试不使用 CORS 重新加载（某些 CDN 可能不支持 CORS）
             const fallbackImg = new Image();
+            fallbackImg.crossOrigin = null; // 移除 CORS 属性
+            
             fallbackImg.onload = () => {
               try {
                 ctx.drawImage(fallbackImg, x, y, w, h);
-                console.log('✓ Fallback image drawn successfully');
+                console.log('✓ Fallback image drawn successfully (no CORS)');
                 resolve(true);
               } catch (fallbackError) {
                 console.error('Fallback draw failed:', fallbackError);
                 resolve(false);
               }
             };
+            
             fallbackImg.onerror = () => {
               console.error('Fallback image load also failed');
               resolve(false);
             };
+            
             fallbackImg.src = url;
           };
           
@@ -764,23 +753,45 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       }
 
       // 使用 canvas.toBlob 而不是 toDataURL，更高效
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          alert(lang === 'zh' ? '导出失败，请重试' : 'Export failed, please try again');
+      // 处理 Tainted Canvas 问题：使用 try-catch 和降级方案
+      try {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            alert(lang === 'zh' ? '导出失败，请重试' : 'Export failed, please try again');
+            setIsLoading(false);
+            return;
+          }
+          
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Storyboard_Export_${Date.now()}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
           setIsLoading(false);
-          return;
+        }, 'image/jpeg', 0.9);
+      } catch (blobError) {
+        // 如果 toBlob 失败（Tainted Canvas），尝试使用 toDataURL 降级方案
+        console.warn('toBlob failed, trying toDataURL fallback:', blobError);
+        try {
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = `Storyboard_Export_${Date.now()}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setIsLoading(false);
+        } catch (dataUrlError) {
+          console.error('Both toBlob and toDataURL failed:', dataUrlError);
+          alert(lang === 'zh' 
+            ? '导出失败：Canvas 被污染，请确保所有图片都能正常加载' 
+            : 'Export failed: Canvas is tainted. Please ensure all images load correctly');
+          setIsLoading(false);
         }
-        
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Storyboard_Export_${Date.now()}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setIsLoading(false);
-      }, 'image/jpeg', 0.9);
+      }
     } catch (e) {
       console.error("Export failed", e);
       alert(lang === 'zh' ? '导出失败：' + String(e) : 'Export failed: ' + String(e));
