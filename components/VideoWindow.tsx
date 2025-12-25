@@ -1,18 +1,5 @@
 import React, { useState, useRef } from 'react';
-
-export interface VideoItem {
-  id: string;
-  taskId: string;
-  status: 'loading' | 'completed' | 'failed';
-  progress: number;
-  videoUrl?: string;
-  error?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  createdAt: number;
-}
+import { VideoItem } from '../types';
 
 interface VideoWindowProps {
   item: VideoItem;

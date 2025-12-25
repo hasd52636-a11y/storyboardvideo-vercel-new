@@ -113,6 +113,72 @@ export interface VideoItem {
   createdAt: number;
 }
 
+// Video Service Types
+export interface VideoServiceConfig {
+  baseUrl: string;
+  apiKey: string;
+}
+
+export interface VideoStatus {
+  task_id: string;
+  status: 'NOT_START' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
+  progress: string;
+  created_at?: number;
+  submit_time?: number;
+  start_time?: number;
+  finish_time?: number;
+  model?: string;
+  duration?: number;
+  size?: string;
+  video_url?: string;
+  fail_reason?: string;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+export interface CreateVideoOptions {
+  model: 'sora-2' | 'sora-2-pro';
+  aspect_ratio?: '16:9' | '9:16';
+  duration?: 10 | 15 | 25;
+  hd?: boolean;
+  images?: string[];
+  notify_hook?: string;
+  watermark?: boolean;
+  private?: boolean;
+  character_url?: string;
+  character_timestamps?: string;
+}
+
+export interface TokenQuota {
+  total_quota: number;
+  used_quota: number;
+  remaining_quota: number;
+}
+
+export interface StoryboardShot {
+  duration: number;
+  scene: string;
+}
+
+export interface StoryboardOptions extends CreateVideoOptions {
+  shots: StoryboardShot[];
+}
+
+export interface Character {
+  id: string;
+  username: string;
+  permalink: string;
+  profile_picture_url: string;
+}
+
+export interface CreateCharacterOptions {
+  url?: string;
+  from_task?: string;
+  timestamps: string;
+}
+
 export const STYLES: StyleOption[] = [
   { id: 'sketch', name: 'Minimal Sketch', nameZh: '极简素描', color: '#a8a29e', description: 'Rough pencil, loose lines', descriptionZh: '铅笔草稿，线条疏松' },
   { id: 'realistic', name: 'Realistic', nameZh: '写实风格', color: '#8B5CF6', description: 'Photorealistic, detailed', descriptionZh: '写实摄影，细节丰富' },

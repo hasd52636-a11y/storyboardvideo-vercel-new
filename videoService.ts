@@ -1,54 +1,14 @@
 // videoService.ts
-
-interface VideoServiceConfig {
-  baseUrl: string;
-  apiKey: string;
-}
-
-interface VideoStatus {
-  task_id: string;
-  status: 'NOT_START' | 'SUBMITTED' | 'QUEUED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
-  progress: string;
-  created_at?: number;
-  submit_time?: number;
-  start_time?: number;
-  finish_time?: number;
-  model?: string;
-  duration?: number;
-  size?: string;
-  video_url?: string;
-  fail_reason?: string;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-interface CreateVideoOptions {
-  model: 'sora-2' | 'sora-2-pro';
-  aspect_ratio?: '16:9' | '9:16';
-  duration?: 10 | 15 | 25;
-  hd?: boolean;
-  images?: string[];
-  notify_hook?: string;
-  watermark?: boolean;
-  private?: boolean;
-}
-
-interface TokenQuota {
-  total_quota: number;
-  used_quota: number;
-  remaining_quota: number;
-}
-
-interface StoryboardShot {
-  duration: number;
-  scene: string;
-}
-
-interface StoryboardOptions extends CreateVideoOptions {
-  shots: StoryboardShot[];
-}
+import {
+  VideoServiceConfig,
+  VideoStatus,
+  CreateVideoOptions,
+  TokenQuota,
+  StoryboardShot,
+  StoryboardOptions,
+  Character,
+  CreateCharacterOptions
+} from './types';
 
 class VideoService {
   private config: VideoServiceConfig;
@@ -88,6 +48,14 @@ class VideoService {
 
       if (options.notify_hook) {
         body.notify_hook = options.notify_hook;
+      }
+
+      if (options.character_url) {
+        body.character_url = options.character_url;
+      }
+
+      if (options.character_timestamps) {
+        body.character_timestamps = options.character_timestamps;
       }
 
       const response = await fetch(endpoint, {
@@ -155,38 +123,6 @@ class VideoService {
     }
   }
 
-  async remixVideo(
-    taskId: string,
-    prompt: string
-  ): Promise<{ task_id: string; status: string; progress: number }> {
-    try {
-      const endpoint = `${this.config.baseUrl}/v1/videos/${taskId}/remix`;
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: this.buildHeaders(),
-        body: JSON.stringify({ prompt })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      const data = JSON.parse(responseText);
-
-      return {
-        task_id: data.task_id,
-        status: data.status,
-        progress: data.progress
-      };
-    } catch (error) {
-      console.error('Remix video error:', error);
-      throw error;
-    }
-  }
-
   async getTokenQuota(): Promise<TokenQuota> {
     try {
       const endpoint = `${this.config.baseUrl}/v1/token/quota`;
@@ -235,6 +171,53 @@ class VideoService {
     } catch (error) {
       console.error('Check quota error:', error);
       return false;
+    }
+  }
+
+  // 创建角色
+  async createCharacter(options: CreateCharacterOptions): Promise<Character> {
+    try {
+      if (!options.url && !options.from_task) {
+        throw new Error('Either url or from_task must be provided');
+      }
+
+      const endpoint = `${this.config.baseUrl}/sora/v1/characters`;
+
+      const body: any = {
+        timestamps: options.timestamps
+      };
+
+      if (options.url) {
+        body.url = options.url;
+      }
+
+      if (options.from_task) {
+        body.from_task = options.from_task;
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: this.buildHeaders(),
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error (${response.status}): ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      const data = JSON.parse(responseText);
+
+      return {
+        id: data.id,
+        username: data.username,
+        permalink: data.permalink,
+        profile_picture_url: data.profile_picture_url
+      };
+    } catch (error) {
+      console.error('Create character error:', error);
+      throw error;
     }
   }
 
@@ -362,4 +345,4 @@ class VideoService {
 }
 
 export default VideoService;
-export type { VideoStatus, CreateVideoOptions, VideoServiceConfig, TokenQuota, StoryboardShot, StoryboardOptions };
+export type { VideoStatus, CreateVideoOptions, VideoServiceConfig, TokenQuota, StoryboardShot, StoryboardOptions, Character, CreateCharacterOptions };

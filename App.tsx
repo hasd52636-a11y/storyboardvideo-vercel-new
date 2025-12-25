@@ -8,6 +8,7 @@ import SidebarRight from './components/SidebarRight';
 import KeySelection from './components/KeySelection';
 import BatchRedrawDialog from './components/BatchRedrawDialog';
 import VideoGenDialog from './components/VideoGenDialog';
+import VideoEditDialog from './components/VideoEditDialog';
 import VideoWindow from './components/VideoWindow';
 import HelpModal from './components/HelpModal';
 import VideoService from './videoService';
@@ -42,6 +43,8 @@ const App: React.FC = () => {
   // Video generation state
   const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
   const [showVideoGenDialog, setShowVideoGenDialog] = useState(false);
+  const [showVideoEditDialog, setShowVideoEditDialog] = useState(false);
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [videoGenDialogPrompt, setVideoGenDialogPrompt] = useState('');
   const videoServiceRef = useRef<VideoService | null>(null);
   
@@ -543,32 +546,72 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number): Promise<boolean> => {
         return new Promise((resolve) => {
           const img = new Image();
-          // 只对非 data URL 设置 crossOrigin
+          
+          // 处理 CORS 问题：尝试多种方式加载图片
           if (!url.startsWith('data:')) {
+            // 首先尝试 anonymous CORS
             img.crossOrigin = "anonymous";
           }
           
           const timeout = setTimeout(() => {
-            console.warn('Image load timeout');
+            console.warn(`Image load timeout: ${url.substring(0, 50)}`);
             resolve(false);
-          }, 20000);
+          }, 25000);
           
           img.onload = () => {
             clearTimeout(timeout);
             try {
-              ctx.drawImage(img, x, y, w, h);
-              console.log('✓ Image drawn successfully');
-              resolve(true);
+              // 检查图片是否已加载
+              if (img.width > 0 && img.height > 0) {
+                ctx.drawImage(img, x, y, w, h);
+                console.log(`✓ Image drawn successfully: ${url.substring(0, 50)}`);
+                resolve(true);
+              } else {
+                console.warn('Image loaded but has zero dimensions');
+                resolve(false);
+              }
             } catch (e) {
-              console.error('Failed to draw image:', e);
-              resolve(false);
+              console.error('Failed to draw image on canvas:', e);
+              // 尝试不使用 CORS 重新加载
+              const fallbackImg = new Image();
+              fallbackImg.onload = () => {
+                try {
+                  ctx.drawImage(fallbackImg, x, y, w, h);
+                  console.log('✓ Fallback image drawn successfully');
+                  resolve(true);
+                } catch (fallbackError) {
+                  console.error('Fallback also failed:', fallbackError);
+                  resolve(false);
+                }
+              };
+              fallbackImg.onerror = () => {
+                console.error('Fallback image load failed');
+                resolve(false);
+              };
+              fallbackImg.src = url;
             }
           };
           
           img.onerror = () => {
             clearTimeout(timeout);
-            console.warn('Image load failed');
-            resolve(false);
+            console.warn(`Image load failed: ${url.substring(0, 50)}`);
+            // 尝试不使用 CORS 重新加载
+            const fallbackImg = new Image();
+            fallbackImg.onload = () => {
+              try {
+                ctx.drawImage(fallbackImg, x, y, w, h);
+                console.log('✓ Fallback image drawn successfully');
+                resolve(true);
+              } catch (fallbackError) {
+                console.error('Fallback draw failed:', fallbackError);
+                resolve(false);
+              }
+            };
+            fallbackImg.onerror = () => {
+              console.error('Fallback image load also failed');
+              resolve(false);
+            };
+            fallbackImg.src = url;
           };
           
           img.src = url;
@@ -674,27 +717,49 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             ctx.fillText(`SC-${String(frameNum).padStart(2, '0')}`, x + 18, y + 30);
             console.log(`✓ Frame ${i + 1} loaded successfully`);
           } else {
-            // 绘制占位符
-            ctx.fillStyle = '#eeeeee';
+            // 绘制占位符 - 浅灰色背景
+            ctx.fillStyle = '#f0f0f0';
             ctx.fillRect(x, y, frameW, frameH);
             ctx.strokeStyle = '#0000ff';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, frameW, frameH);
+            
+            // 显示错误信息
             ctx.fillStyle = '#999999';
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText('Failed', x + 10, y + 20);
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('Image Failed', x + 10, y + frameH / 2 - 10);
+            ctx.font = '12px Arial';
+            ctx.fillText('to Load', x + 10, y + frameH / 2 + 10);
+            
+            // 仍然显示场景编号
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(x + 10, y + 10, 60, 28);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '700 14px Inter';
+            ctx.fillText(`SC-${String(frameNum).padStart(2, '0')}`, x + 18, y + 30);
+            
+            console.warn(`⚠ Frame ${i + 1} image failed to load, showing placeholder`);
           }
         } catch (e) { 
           console.error(`✗ Frame ${i + 1} load fail:`, e);
           // 绘制占位符
-          ctx.fillStyle = '#eeeeee';
+          ctx.fillStyle = '#f0f0f0';
           ctx.fillRect(x, y, frameW, frameH);
           ctx.strokeStyle = '#0000ff';
           ctx.lineWidth = 2;
           ctx.strokeRect(x, y, frameW, frameH);
+          
+          // 显示错误信息
           ctx.fillStyle = '#999999';
-          ctx.font = 'bold 12px Arial';
-          ctx.fillText('Failed', x + 10, y + 20);
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText('Error', x + 10, y + frameH / 2 - 10);
+          
+          // 仍然显示场景编号
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.fillRect(x + 10, y + 10, 60, 28);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 14px Inter';
+          ctx.fillText(`SC-${String(frameNum).padStart(2, '0')}`, x + 18, y + 30);
         }
       }
 
@@ -938,9 +1003,88 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
   }, [videoItems]);
 
   const handleEditVideo = useCallback((videoId: string) => {
-    // TODO: Implement video editing
-    alert(lang === 'zh' ? '视频编辑功能开发中' : 'Video editing feature coming soon');
-  }, [lang]);
+    setEditingVideoId(videoId);
+    setShowVideoEditDialog(true);
+  }, []);
+
+  const handleApplyVideoEdit = useCallback(async (newPrompt: string) => {
+    if (!editingVideoId || !videoServiceRef.current) return;
+
+    const videoItem = videoItems.find(item => item.id === editingVideoId);
+    if (!videoItem) return;
+
+    try {
+      setIsLoading(true);
+
+      // Get selected storyboard images
+      const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
+      const images = selectedFrames.map(it => it.imageUrl);
+
+      // Create new video with edited prompt
+      const result = await videoServiceRef.current.createVideo(newPrompt, {
+        model: 'sora-2-pro',
+        aspect_ratio: '16:9',
+        duration: 10,
+        hd: false,
+        images: images.length > 0 ? images : undefined
+      });
+
+      // Update video item with new task
+      setVideoItems(prev => prev.map(item =>
+        item.id === editingVideoId
+          ? {
+              ...item,
+              taskId: result.task_id,
+              prompt: newPrompt,
+              status: 'loading',
+              progress: 0,
+              videoUrl: undefined,
+              error: undefined
+            }
+          : item
+      ));
+
+      // Start polling for new video
+      videoServiceRef.current.startPolling(
+        result.task_id,
+        (status) => {
+          setVideoItems(prev => prev.map(item =>
+            item.taskId === result.task_id
+              ? {
+                  ...item,
+                  progress: status.progress,
+                  status: status.status === 'SUCCESS' ? 'completed' : status.status === 'FAILURE' ? 'failed' : 'loading',
+                  videoUrl: status.video_url || item.videoUrl,
+                  error: status.error?.message
+                }
+              : item
+          ));
+        },
+        (videoUrl) => {
+          setVideoItems(prev => prev.map(item =>
+            item.taskId === result.task_id
+              ? { ...item, status: 'completed', videoUrl: videoUrl || item.videoUrl }
+              : item
+          ));
+        },
+        (error) => {
+          setVideoItems(prev => prev.map(item =>
+            item.taskId === result.task_id
+              ? { ...item, status: 'failed', error: typeof error === 'string' ? error : error.message }
+              : item
+          ));
+        }
+      );
+
+      setShowVideoEditDialog(false);
+      setEditingVideoId(null);
+    } catch (error) {
+      console.error('Video edit error:', error);
+      alert(lang === 'zh' ? '视频重新生成失败：' + String(error) : 'Video regeneration failed: ' + String(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [editingVideoId, videoItems, items, selectedIds, lang]);
 
   const handleVideoWindowDragStart = useCallback((videoId: string, e: React.MouseEvent) => {
     const videoItem = videoItems.find(item => item.id === videoId);
@@ -1247,6 +1391,20 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             symbols: it.symbols
           }))}
           symbolDescriptions={SYMBOL_DESCRIPTIONS}
+        />
+      )}
+
+      {/* Video edit dialog */}
+      {showVideoEditDialog && editingVideoId && (
+        <VideoEditDialog
+          video={videoItems.find(item => item.id === editingVideoId)!}
+          onEdit={handleApplyVideoEdit}
+          onCancel={() => {
+            setShowVideoEditDialog(false);
+            setEditingVideoId(null);
+          }}
+          lang={lang}
+          isLoading={isLoading}
         />
       )}
 
