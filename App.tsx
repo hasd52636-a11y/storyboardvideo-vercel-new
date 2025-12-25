@@ -11,6 +11,8 @@ import VideoGenDialog from './components/VideoGenDialog';
 import VideoEditDialog from './components/VideoEditDialog';
 import VideoWindow from './components/VideoWindow';
 import HelpModal from './components/HelpModal';
+import AuthDialog from './components/AuthDialog';
+import AdminPanel from './components/AdminPanel';
 import VideoService from './videoService';
 
 interface HelpSection {
@@ -39,6 +41,13 @@ const App: React.FC = () => {
   const [currentStyle, setCurrentStyle] = useState<StyleOption | null>(null);
   const [currentAspectRatio, setCurrentAspectRatio] = useState<AspectRatio | null>(null);
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
+  
+  // Auth state
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userBalance, setUserBalance] = useState(0);
   
   // Video generation state
   const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
@@ -77,6 +86,60 @@ const App: React.FC = () => {
     localStorage.setItem('director_canvas_theme', newTheme);
   };
 
+  const handleLoginSuccess = (token: string, user: any) => {
+    setAuthToken(token);
+    setCurrentUser(user);
+    setUserBalance(user.balance);
+    localStorage.setItem('director_canvas_auth_token', token);
+    setShowAuthDialog(false);
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setCurrentUser(null);
+    setUserBalance(0);
+    localStorage.removeItem('director_canvas_auth_token');
+    setShowAuthDialog(true);
+  };
+
+  const deductBalance = async (amount: number, description: string) => {
+    if (!authToken) return false;
+    
+    try {
+      const response = await fetch('/api/user/deduct', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount, description })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserBalance(data.user.balance);
+        return true;
+      } else {
+        const error = await response.json();
+        alert(lang === 'zh' ? `余额不足: ${error.error}` : `Insufficient balance: ${error.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Failed to deduct balance:', error);
+      return false;
+    }
+  };
+
+  const checkBalance = (requiredAmount: number): boolean => {
+    if (userBalance < requiredAmount) {
+      alert(lang === 'zh' 
+        ? `余额不足。需要 ¥${requiredAmount}，当前余额 ¥${userBalance}` 
+        : `Insufficient balance. Required ¥${requiredAmount}, current balance ¥${userBalance}`);
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     const checkKey = async () => {
       const saved = localStorage.getItem('director_canvas_api_config');
@@ -86,6 +149,35 @@ const App: React.FC = () => {
         setHasKey(await (window as any).aistudio.hasSelectedApiKey());
       } else {
         setHasKey(false);
+      }
+    };
+    
+    // 检查用户认证状态
+    const checkAuth = async () => {
+      const savedToken = localStorage.getItem('director_canvas_auth_token');
+      if (savedToken) {
+        setAuthToken(savedToken);
+        // 验证 token 并获取用户信息
+        try {
+          const response = await fetch('/api/user/profile', {
+            headers: { 'Authorization': `Bearer ${savedToken}` }
+          });
+          if (response.ok) {
+            const user = await response.json();
+            setCurrentUser(user);
+            setUserBalance(user.balance);
+          } else {
+            // Token 无效，清除
+            localStorage.removeItem('director_canvas_auth_token');
+            setShowAuthDialog(true);
+          }
+        } catch (error) {
+          console.error('Failed to verify auth token:', error);
+          setShowAuthDialog(true);
+        }
+      } else {
+        // 没有 token，显示登录对话框
+        setShowAuthDialog(true);
       }
     };
     
@@ -108,6 +200,7 @@ const App: React.FC = () => {
     }
     
     checkKey();
+    checkAuth();
   }, []);
 
   // 加载帮助内容
@@ -158,6 +251,12 @@ const App: React.FC = () => {
 
   const handleGenerateFromScript = useCallback(async (scriptText: string, sceneCount: number, style?: any, aspectRatio?: string, duration?: number) => {
     if (!scriptText.trim()) return;
+    
+    // 检查余额（假设每个分镜 0.5 元）
+    const costPerScene = 0.5;
+    const totalCost = sceneCount * costPerScene;
+    if (!checkBalance(totalCost)) return;
+    
     setIsLoading(true);
     try {
       const scenes = await parseScriptToScenes(scriptText, sceneCount);
@@ -205,15 +304,26 @@ const App: React.FC = () => {
         }
       }
       setItems(prev => [...prev, ...newItems]);
+      
+      // 扣费
+      if (newItems.length > 0) {
+        await deductBalance(totalCost, `生成 ${newItems.length} 个分镜`);
+      }
     } catch (e) {
       console.error("Failed to generate from script", e);
     } finally {
       setIsLoading(false);
     }
-  }, [items.length, canvasOffset, globalColorMode]);
+  }, [items.length, canvasOffset, globalColorMode, authToken, userBalance, lang]);
 
   const handleGenerateFromDialogue = useCallback(async (scenes: any[], frameCount: number, styleId: string, aspectRatio?: string, duration?: number) => {
     if (!scenes || scenes.length === 0) return;
+    
+    // 检查余额（假设每个分镜 0.5 元）
+    const costPerScene = 0.5;
+    const totalCost = frameCount * costPerScene;
+    if (!checkBalance(totalCost)) return;
+    
     setIsLoading(true);
     try {
       const newItems: StoryboardItem[] = [];
@@ -264,12 +374,17 @@ const App: React.FC = () => {
         }
       }
       setItems(prev => [...prev, ...newItems]);
+      
+      // 扣费
+      if (newItems.length > 0) {
+        await deductBalance(totalCost, `生成 ${newItems.length} 个分镜`);
+      }
     } catch (e) {
       console.error("Failed to generate from dialogue", e);
     } finally {
       setIsLoading(false);
     }
-  }, [items.length, canvasOffset, globalColorMode]);
+  }, [items.length, canvasOffset, globalColorMode, authToken, userBalance, lang]);
 
   const handleAction = useCallback(async (id: string, action: string, data?: any) => {
     if (action === 'delete') {
@@ -280,6 +395,9 @@ const App: React.FC = () => {
     } else if (action === 'resize' && data) {
       setItems(prev => prev.map(it => it.id === id ? { ...it, width: data.width, height: data.height } : it));
     } else if (action === 'regenerate') {
+      // 检查余额（重新生成一个分镜 0.5 元）
+      if (!checkBalance(0.5)) return;
+      
       const target = items.find(it => it.id === id);
       if (!target) return;
       setIsLoading(true);
@@ -289,7 +407,11 @@ const App: React.FC = () => {
       const enrichedPrompt = symbolInstructions ? `${promptToUse}. Key actions: ${symbolInstructions}` : promptToUse;
       const isBlackAndWhite = target.colorMode === 'blackAndWhite';
       const newUrl = await generateSceneImage(enrichedPrompt, true, isBlackAndWhite, undefined, target.aspectRatio);
-      if (newUrl) setItems(prev => prev.map(it => it.id === id ? { ...it, imageUrl: newUrl, filter: FilterMode.LINE_ART, prompt: promptToUse } : it));
+      if (newUrl) {
+        setItems(prev => prev.map(it => it.id === id ? { ...it, imageUrl: newUrl, filter: FilterMode.LINE_ART, prompt: promptToUse } : it));
+        // 扣费
+        await deductBalance(0.5, '重新生成分镜');
+      }
       setIsLoading(false);
     } else if (action === 'copy') {
       const target = items.find(it => it.id === id);
@@ -299,7 +421,7 @@ const App: React.FC = () => {
     } else if (action === 'setMain') {
       setItems(prev => prev.map(it => ({ ...it, isMain: it.id === id })));
     }
-  }, [items, lang]);
+  }, [items, lang, authToken, userBalance]);
 
   const getFormattedPrompts = useCallback(() => {
     if (selectedIds.size === 0) return "";
@@ -1309,7 +1431,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
     }}>
       <input type="file" ref={importInputRef} onChange={handleFileImport} className="hidden" accept="image/*" multiple />
       
-      <div className="fixed top-0 left-0 right-0 h-20 px-8 flex items-center justify-start z-50 no-print pointer-events-none">
+      <div className="fixed top-0 left-0 right-0 h-20 px-8 flex items-center justify-between z-50 no-print pointer-events-none">
         <div className="flex items-center gap-4 pointer-events-auto">
           <div className="w-14 h-14 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl">
             <span className="text-white font-black text-3xl">L</span>
@@ -1318,6 +1440,47 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             <span className={`text-lg font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{lang === 'zh' ? '分镜大师' : 'Storyboard Master'}</span>
             <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">{lang === 'zh' ? 'Storyboard Master' : '分镜大师'}</span>
           </div>
+        </div>
+        
+        {/* User Info and Balance Display */}
+        <div className="flex items-center gap-4 pointer-events-auto">
+          {currentUser && (
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-lg ${theme === 'dark' ? 'bg-zinc-800' : 'bg-zinc-100'}`}>
+              <div className="flex flex-col items-end">
+                <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>
+                  {currentUser.username}
+                </span>
+                <span className="text-xs text-purple-500 font-bold">
+                  ¥{userBalance.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {currentUser && (
+            <>
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
+                  theme === 'dark'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+              >
+                {lang === 'zh' ? '管理' : 'Admin'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
+                  theme === 'dark'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+              >
+                {lang === 'zh' ? '登出' : 'Logout'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1433,6 +1596,21 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       ))}
 
       {isLoading && <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 to-indigo-600 animate-[loading_2s_infinite] z-[100]" />}
+      
+      {/* Auth Dialog */}
+      {showAuthDialog && (
+        <AuthDialog
+          onClose={() => setShowAuthDialog(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
+      
+      {/* Admin Panel */}
+      {showAdminPanel && (
+        <AdminPanel
+          onClose={() => setShowAdminPanel(false)}
+        />
+      )}
     </div>
   );
 };
