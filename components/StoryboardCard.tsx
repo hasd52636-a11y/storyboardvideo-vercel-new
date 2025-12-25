@@ -92,7 +92,7 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
             <button onClick={() => { onAction(item.id, 'setMain'); setShowMenu(false); }} className="p-3 text-left hover:text-red-500 transition-all">{t.setKey}</button>
             <button onClick={() => { fileInputRef.current?.click(); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.replace}</button>
             {!item.isMain && selectedCount && selectedCount > 1 ? (
-              <button onClick={() => { onShowBatchRedrawDialog?.(); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{lang === 'zh' ? '批量重绘' : 'Batch Redraw'}</button>
+              <button onClick={() => { onShowBatchRedrawDialog?.(); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{lang === 'zh' ? `批量重绘 (${selectedCount}张)` : `Batch Redraw (${selectedCount})`}</button>
             ) : (
               !item.isMain && <button onClick={() => { setEditPrompt(item.prompt); setShowEditPrompt(true); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.redrawViewScript}</button>
             )}
