@@ -452,13 +452,17 @@ export class APIConfigManager implements IConfigManager {
         const { PrismaClient } = await import('@prisma/client');
         const prisma = new PrismaClient();
         
-        const dbConfig = await prisma.multimediaAPIConfig.findUnique({
-          where: { userId },
-        });
-        
-        if (dbConfig) {
-          this.logger.debug(`[APIConfigManager] Configuration loaded from database for user ${userId}`);
-          return dbConfig.config as MultiMediaConfig;
+        try {
+          const dbConfig = await prisma.multimediaAPIConfig.findUnique({
+            where: { userId },
+          });
+          
+          if (dbConfig) {
+            this.logger.debug(`[APIConfigManager] Configuration loaded from database for user ${userId}`);
+            return dbConfig.config as MultiMediaConfig;
+          }
+        } finally {
+          await prisma.$disconnect();
         }
       } catch (error) {
         this.logger.warn(`[APIConfigManager] Failed to load config from database:`, error);

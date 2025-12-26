@@ -274,14 +274,17 @@ export class OpenAIAdapter implements IMediaAdapter {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
-      const response = await fetch(url, {
+      // 使用全局 fetch（在 Node.js 18+ 和浏览器中都可用）
+      const fetchFn = typeof global !== 'undefined' && global.fetch ? global.fetch : fetch;
+      
+      const response = await fetchFn(url, {
         method,
         headers,
         body: requestBody,
         signal: controller.signal,
-      });
+      } as any);
 
-      return response;
+      return response as Response;
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         throw new APITimeoutError(`Request timeout after ${this.timeout}ms`);
@@ -347,7 +350,9 @@ export class OpenAIAdapter implements IMediaAdapter {
    */
   private async dataUrlToBlob(dataUrl: string): Promise<Blob> {
     if (dataUrl.startsWith('http')) {
-      const response = await fetch(dataUrl);
+      // 使用全局 fetch（在 Node.js 18+ 和浏览器中都可用）
+      const fetchFn = typeof global !== 'undefined' && global.fetch ? global.fetch : fetch;
+      const response = await fetchFn(dataUrl) as Response;
       return response.blob();
     }
 

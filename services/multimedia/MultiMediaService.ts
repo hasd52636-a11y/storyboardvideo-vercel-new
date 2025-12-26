@@ -302,24 +302,42 @@ export class MultiMediaService {
       }
 
       this.logger.debug(`[MultiMediaService] Config providers:`, Object.keys(config.providers || {}));
+      this.logger.debug(`[MultiMediaService] Config configs:`, Object.keys(config.configs || {}));
       this.logger.debug(`[MultiMediaService] Looking for provider for function: ${func}`);
 
       // 获取提供商
-      const provider = config.providers[func];
+      let provider = config.providers[func];
+      
       if (!provider) {
         // 如果没有配置该功能的提供商，尝试使用任何可用的提供商
-        const availableProviders = Object.keys(config.configs || {});
+        const availableProviders = Object.keys(config.configs || {}).filter(p => config.configs[p]);
+        
         if (availableProviders.length === 0) {
+          this.logger.error(`[MultiMediaService] No providers configured at all. Available configs:`, Object.keys(config.configs || {}));
           throw new ProviderNotConfiguredError(`No provider configured for function "${func}"`);
         }
         
-        this.logger.warn(`[MultiMediaService] No provider configured for function "${func}", using first available: ${availableProviders[0]}`);
-        config.providers[func] = availableProviders[0] as MediaProvider;
+        // 选择第一个支持该功能的提供商
+        provider = availableProviders.find(p => {
+          const caps = PROVIDER_CAPABILITIES[p as MediaProvider];
+          return caps && caps[func];
+        }) as MediaProvider;
+
+        if (!provider) {
+          // 如果没有提供商支持该功能，使用第一个可用的
+          provider = availableProviders[0] as MediaProvider;
+          this.logger.warn(`[MultiMediaService] No provider supports function "${func}", using first available: ${provider}`);
+        } else {
+          this.logger.warn(`[MultiMediaService] No provider configured for function "${func}", using: ${provider}`);
+        }
+        
+        config.providers[func] = provider;
       }
 
       // 检查提供商是否支持该功能
       const capabilities = PROVIDER_CAPABILITIES[provider];
       if (!capabilities || !capabilities[func]) {
+        this.logger.error(`[MultiMediaService] Provider "${provider}" does not support function "${func}"`);
         throw new UnsupportedFunctionError(provider, func);
       }
 
