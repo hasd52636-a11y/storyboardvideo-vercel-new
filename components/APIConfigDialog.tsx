@@ -1,53 +1,96 @@
-import React, { useState } from 'react';
-import VideoService from '../videoService';
+import React, { useState, useEffect } from 'react';
+import VideoService, { VideoAPIProvider } from '../videoService';
 
 interface APIConfigDialogProps {
-  onConfigured: (config: { baseUrl: string; apiKey: string }) => void;
+  onConfigured: (config: { baseUrl: string; apiKey: string; provider: VideoAPIProvider }) => void;
   isOpen: boolean;
 }
 
+const DEFAULT_URLS: Record<VideoAPIProvider, string> = {
+  openai: 'https://api.openai.com',
+  dyu: 'https://api.dyuapi.com'
+};
+
+const PROVIDER_INFO: Record<VideoAPIProvider, { name: string; color: string; description: string; getKeyUrl: string }> = {
+  openai: {
+    name: 'OpenAI 官方',
+    color: '#4CAF50',
+    description: '官方支持，最稳定',
+    getKeyUrl: 'https://platform.openai.com/api-keys'
+  },
+  dyu: {
+    name: 'DYU API',
+    color: '#2196F3',
+    description: '功能丰富，支持更多风格',
+    getKeyUrl: 'https://api.dyuapi.com'
+  }
+};
+
 export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialogProps) {
-  const [baseUrl, setBaseUrl] = useState(
-    localStorage.getItem('sora_base_url') || ''
+  const [provider, setProvider] = useState<VideoAPIProvider>(
+    (localStorage.getItem('video_api_provider') as VideoAPIProvider) || 'openai'
   );
   const [apiKey, setApiKey] = useState(
-    localStorage.getItem('sora_api_key') || ''
+    localStorage.getItem(`sora_api_key_${provider}`) || ''
   );
   const [showApiKey, setShowApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [testResult, setTestResult] = useState<{ quota: number; remaining: number } | null>(null);
+
+  // 当提供商改变时，自动加载该提供商的 API Key
+  useEffect(() => {
+    const savedKey = localStorage.getItem(`sora_api_key_${provider}`) || '';
+    setApiKey(savedKey);
+    setError(null);
+    setSuccess(false);
+    setTestResult(null);
+  }, [provider]);
 
   const handleTestConnection = async () => {
-    if (!baseUrl || !apiKey) {
-      setError('请输入 Base URL 和 API Key');
+    if (!apiKey.trim()) {
+      setError('请粘贴你的 API Key');
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setTestResult(null);
 
     try {
-      const videoService = new VideoService({ baseUrl, apiKey });
-      await videoService.getTokenQuota();
+      const baseUrl = DEFAULT_URLS[provider];
+      const videoService = new VideoService({ baseUrl, apiKey, provider });
+      const quota = await videoService.getTokenQuota();
 
       setSuccess(true);
-      setError(null);
+      setTestResult({
+        quota: quota.total_quota,
+        remaining: quota.remaining_quota
+      });
 
-      localStorage.setItem('sora_base_url', baseUrl);
-      localStorage.setItem('sora_api_key', apiKey);
+      // 保存配置
+      localStorage.setItem('video_api_provider', provider);
+      localStorage.setItem(`sora_base_url_${provider}`, baseUrl);
+      localStorage.setItem(`sora_api_key_${provider}`, apiKey);
 
-      onConfigured({ baseUrl, apiKey });
+      onConfigured({ baseUrl, apiKey, provider });
 
       setTimeout(() => {
         setSuccess(false);
-      }, 2000);
+      }, 3000);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : '连接失败，请检查 Base URL 和 API Key'
-      );
+      const errorMsg = err instanceof Error ? err.message : '连接失败';
+      
+      if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+        setError('❌ API Key 无效，请检查是否正确复制');
+      } else if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+        setError('❌ 无权限访问，请检查 API Key 是否有效');
+      } else if (errorMsg.includes('429')) {
+        setError('❌ 请求过于频繁，请稍后再试');
+      } else {
+        setError(`❌ ${errorMsg}`);
+      }
       setSuccess(false);
     } finally {
       setIsLoading(false);
@@ -55,6 +98,9 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
   };
 
   if (!isOpen) return null;
+
+  const info = PROVIDER_INFO[provider];
+  const baseUrl = DEFAULT_URLS[provider];
 
   return (
     <div
@@ -74,85 +120,125 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
       <div
         style={{
           backgroundColor: '#fff',
-          borderRadius: '8px',
-          padding: '30px',
-          maxWidth: '500px',
+          borderRadius: '12px',
+          padding: '40px',
+          maxWidth: '450px',
           width: '90%',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+          maxHeight: '90vh',
+          overflowY: 'auto'
         }}
       >
-        <h2 style={{ marginTop: 0 }}>配置 Sora 2 API</h2>
-
-        <p style={{ color: '#666', fontSize: '14px' }}>
-          请输入你的 Sora 2 API 配置信息。你可以从中转服务（如神马 API）获取这些信息。
+        {/* 标题 */}
+        <h2 style={{ marginTop: 0, marginBottom: '8px', fontSize: '24px', fontWeight: 'bold' }}>
+          🎬 配置视频 API
+        </h2>
+        <p style={{ color: '#999', fontSize: '13px', margin: '0 0 24px 0' }}>
+          只需 3 步，2 分钟完成配置
         </p>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold' }}>
-            Base URL
-            <a
-              href="https://api.whatai.cc/login"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="查看 WhatAI API 文档"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '18px',
-                height: '18px',
-                backgroundColor: '#4CAF50',
-                color: '#fff',
-                borderRadius: '50%',
-                textDecoration: 'none',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#45a049')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#4CAF50')}
-            >
-              ?
-            </a>
-          </label>
-          <input
-            type="text"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://api.xxx.com"
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-          />
-          <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-            示例: https://api.whatai.cc
+        {/* 步骤 1: 选择提供商 */}
+        <div style={{ marginBottom: '28px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', margin: '0 0 12px 0' }}>
+            📍 第 1 步：选择服务商
+          </p>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {(['openai', 'dyu'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setProvider(p)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  backgroundColor: provider === p ? PROVIDER_INFO[p].color : '#f0f0f0',
+                  color: provider === p ? '#fff' : '#333',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  transition: 'all 0.2s',
+                  boxShadow: provider === p ? `0 4px 12px ${PROVIDER_INFO[p].color}40` : 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (provider !== p) {
+                    e.currentTarget.style.backgroundColor = '#e8e8e8';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (provider !== p) {
+                    e.currentTarget.style.backgroundColor = '#f0f0f0';
+                  }
+                }}
+              >
+                {PROVIDER_INFO[p].name}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: '12px', color: '#666', margin: '8px 0 0 0' }}>
+            💡 {info.description}
           </p>
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-            API Key
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        {/* 步骤 2: 获取 API Key */}
+        <div style={{ marginBottom: '28px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', margin: '0 0 12px 0' }}>
+            🔑 第 2 步：获取 API Key
+          </p>
+          <a
+            href={info.getKeyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              padding: '10px 16px',
+              backgroundColor: info.color,
+              color: '#fff',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              transition: 'opacity 0.2s',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+          >
+            👉 点击获取 API Key
+          </a>
+          <p style={{ fontSize: '12px', color: '#999', margin: '8px 0 0 0' }}>
+            会打开新标签页，获取后回来粘贴
+          </p>
+        </div>
+
+        {/* 步骤 3: 粘贴 API Key */}
+        <div style={{ marginBottom: '24px' }}>
+          <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', margin: '0 0 12px 0' }}>
+            📋 第 3 步：粘贴 API Key
+          </p>
+          <div style={{ position: 'relative' }}>
             <input
               type={showApiKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-xxx..."
+              placeholder="粘贴你的 API Key 这里..."
               style={{
                 width: '100%',
-                padding: '10px',
-                paddingRight: '40px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                padding: '12px 40px 12px 12px',
+                border: `2px solid ${error ? '#ff6b6b' : success ? '#51cf66' : '#ddd'}`,
+                borderRadius: '6px',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+                fontFamily: 'monospace',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => {
+                if (!error && !success) {
+                  e.currentTarget.style.borderColor = info.color;
+                }
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = error ? '#ff6b6b' : success ? '#51cf66' : '#ddd';
               }}
             />
             <button
@@ -160,97 +246,108 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
               onClick={() => setShowApiKey(!showApiKey)}
               style={{
                 position: 'absolute',
-                right: '10px',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '18px',
+                fontSize: '16px',
                 padding: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#666',
-                transition: 'color 0.2s'
+                color: '#999'
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#333')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#666')}
-              title={showApiKey ? '隐藏密钥' : '显示密钥'}
+              title={showApiKey ? '隐藏' : '显示'}
             >
               {showApiKey ? '👁️' : '👁️‍🗨️'}
             </button>
           </div>
-          <p style={{ fontSize: '12px', color: '#999', margin: '5px 0 0 0' }}>
-            你的 API 密钥将被保存在本地存储中
-          </p>
         </div>
 
+        {/* 错误提示 */}
         {error && (
           <div
             style={{
-              backgroundColor: '#ffebee',
-              color: '#c62828',
+              backgroundColor: '#ffe0e0',
+              color: '#d32f2f',
               padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              fontSize: '14px'
+              borderRadius: '6px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              border: '1px solid #ffb3b3'
             }}
           >
-            ❌ {error}
+            {error}
           </div>
         )}
 
-        {success && (
+        {/* 成功提示 */}
+        {success && testResult && (
           <div
             style={{
               backgroundColor: '#e8f5e9',
               color: '#2e7d32',
               padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              fontSize: '14px'
+              borderRadius: '6px',
+              marginBottom: '16px',
+              fontSize: '13px',
+              border: '1px solid #c8e6c9'
             }}
           >
-            ✅ 连接成功！配置已保存
+            ✅ 连接成功！
+            <br />
+            剩余配额: <strong>{testResult.remaining}</strong> / {testResult.quota}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={handleTestConnection}
-            disabled={isLoading || !baseUrl || !apiKey}
-            style={{
-              flex: 1,
-              padding: '10px',
-              backgroundColor: isLoading ? '#ccc' : '#4CAF50',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
-          >
-            {isLoading ? '测试中...' : '测试连接'}
-          </button>
-        </div>
+        {/* 测试按钮 */}
+        <button
+          onClick={handleTestConnection}
+          disabled={isLoading || !apiKey.trim()}
+          style={{
+            width: '100%',
+            padding: '14px',
+            backgroundColor: isLoading ? '#ccc' : info.color,
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+            opacity: isLoading || !apiKey.trim() ? 0.6 : 1
+          }}
+          onMouseEnter={(e) => {
+            if (!isLoading && apiKey.trim()) {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = `0 4px 12px ${info.color}40`;
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          {isLoading ? '⏳ 测试中...' : '✨ 测试连接'}
+        </button>
 
+        {/* 快速提示 */}
         <div
           style={{
             marginTop: '20px',
-            padding: '15px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '4px',
+            padding: '12px',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '6px',
             fontSize: '12px',
-            color: '#666'
+            color: '#666',
+            border: '1px solid #f0f0f0'
           }}
         >
-          <strong>如何获取 API 密钥？</strong>
-          <ol style={{ margin: '10px 0 0 0', paddingLeft: '20px' }}>
-            <li>注册中转服务账号（如神马 API）</li>
-            <li>在账户设置中获取 Base URL</li>
-            <li>生成或复制你的 API Key</li>
-            <li>粘贴到上面的输入框中</li>
-          </ol>
+          <strong>💡 提示：</strong>
+          <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+            <li>API Key 只保存在你的浏览器中</li>
+            <li>不会上传到任何服务器</li>
+            <li>可以随时更换或删除</li>
+          </ul>
         </div>
       </div>
     </div>

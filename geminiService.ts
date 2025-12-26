@@ -31,25 +31,65 @@ export const testApiConnection = async (config: ProviderConfig, type: 'llm' | 'i
       });
       return !!response;
     } else {
-      // 测试 OpenAI 兼容的 API
-      const endpoint = type === 'image' 
-        ? `${config.baseUrl}/images/generations`
-        : `${config.baseUrl}/chat/completions`;
+      // 通过服务器端 API 测试（避免 CORS 问题）
+      console.log('[testApiConnection] Testing via server for', type, 'with provider', config.provider);
+      
+      const testType = type === 'image' ? 'textToImage' : 'textGeneration';
+      
+      // 构建配置
+      const multimediaConfig = {
+        providers: {
+          [testType]: config.provider
+        },
+        configs: {
+          [config.provider]: {
+            apiKey: config.apiKey,
+            baseUrl: config.baseUrl,
+            endpoints: {}
+          }
+        }
+      };
+      
+      const endpoint = type === 'image'
+        ? '/api/multimedia?action=text-to-image'
+        : '/api/multimedia?action=text-generation';
       
       const body = type === 'image'
-        ? { model: config.imageModel, prompt: 'test', n: 1, size: '512x512' }
-        : { model: config.llmModel, messages: [{ role: 'user', content: 'test' }], max_tokens: 10 };
+        ? { 
+            prompt: 'test image', 
+            model: config.imageModel,
+            _config: multimediaConfig
+          }
+        : { 
+            messages: [
+              { role: 'user', content: 'test' }
+            ],
+            model: config.llmModel,
+            _config: multimediaConfig
+          };
+      
+      console.log('[testApiConnection] Calling server endpoint:', endpoint);
       
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`
         },
         body: JSON.stringify(body)
       });
       
-      return response.ok;
+      console.log('[testApiConnection] Server response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[testApiConnection] Server error:', errorText);
+        return false;
+      }
+      
+      const data = await response.json();
+      console.log('[testApiConnection] Server response success:', data.success);
+      
+      return data.success === true;
     }
   } catch (e) {
     console.error("API Test Failed:", e);

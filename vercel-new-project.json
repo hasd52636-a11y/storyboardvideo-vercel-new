@@ -1,9 +1,0 @@
-{
-  "name": "storyboard-master-v2",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "env": {
-    "VITE_API_KEY": "@storyboard_v2_api_key"
-  }
-}

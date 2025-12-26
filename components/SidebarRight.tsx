@@ -52,6 +52,9 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
   const [chatStyle, setChatStyle] = useState<StyleOption | null>(null);
   const [chatAspectRatio, setChatAspectRatio] = useState<AspectRatio | null>(null);
 
+  // Symbol library tabs state
+  const [symbolLibraryTab, setSymbolLibraryTab] = useState<'camera-motion' | 'action-motion' | 'quick-storyboard'>('quick-storyboard');
+
   const t = I18N[lang];
   const models: ModelProvider[] = ['banana', 'gemini', 'openai', 'veo'];
 
@@ -283,15 +286,131 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   </button>
                 </section>
                 
+                {/* Symbol Library Tabs Section */}
                 <section className="space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-widest opacity-40">{t.symbols}</h3>
-                  <div className="grid grid-cols-4 gap-3">
-                    {symbols.map(s => (
-                      <div key={s.type} draggable onDragStart={e => handleDragStart(e, s.type)} className={`h-12 border rounded-xl flex items-center justify-center text-2xl cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-400 hover:border-purple-500/50' : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-purple-500/50'}`} title={s.title}>
-                        {SYMBOL_LABELS[s.type]}
-                      </div>
-                    ))}
+                  {/* Tab Navigation */}
+                  <div className={`flex border-b gap-0 ${theme === 'dark' ? 'border-white/10' : 'border-zinc-200'}`}>
+                    <button
+                      onClick={() => setSymbolLibraryTab('camera-motion')}
+                      className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        symbolLibraryTab === 'camera-motion'
+                          ? theme === 'dark'
+                            ? 'text-purple-400 border-b-2 border-purple-400'
+                            : 'text-purple-600 border-b-2 border-purple-600'
+                          : theme === 'dark'
+                          ? 'text-zinc-500 hover:text-zinc-400'
+                          : 'text-zinc-400 hover:text-zinc-500'
+                      }`}
+                      title={lang === 'zh' ? '一键运镜' : 'Camera Motion'}
+                    >
+                      {lang === 'zh' ? '一键运镜' : 'Camera'}
+                    </button>
+                    <button
+                      onClick={() => setSymbolLibraryTab('action-motion')}
+                      className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        symbolLibraryTab === 'action-motion'
+                          ? theme === 'dark'
+                            ? 'text-purple-400 border-b-2 border-purple-400'
+                            : 'text-purple-600 border-b-2 border-purple-600'
+                          : theme === 'dark'
+                          ? 'text-zinc-500 hover:text-zinc-400'
+                          : 'text-zinc-400 hover:text-zinc-500'
+                      }`}
+                      title={lang === 'zh' ? '一键动作' : 'Action Motion'}
+                    >
+                      {lang === 'zh' ? '一键动作' : 'Action'}
+                    </button>
+                    <button
+                      onClick={() => setSymbolLibraryTab('quick-storyboard')}
+                      className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        symbolLibraryTab === 'quick-storyboard'
+                          ? theme === 'dark'
+                            ? 'text-purple-400 border-b-2 border-purple-400'
+                            : 'text-purple-600 border-b-2 border-purple-600'
+                          : theme === 'dark'
+                          ? 'text-zinc-500 hover:text-zinc-400'
+                          : 'text-zinc-400 hover:text-zinc-500'
+                      }`}
+                      title={lang === 'zh' ? '快捷分镜' : 'Quick Storyboard'}
+                    >
+                      {lang === 'zh' ? '快捷分镜' : 'Quick'}
+                    </button>
                   </div>
+
+                  {/* Camera Motion Tab */}
+                  {symbolLibraryTab === 'camera-motion' && (
+                    <div className="grid grid-cols-4 gap-3">
+                      {symbols.map(s => (
+                        <div key={s.type} draggable onDragStart={e => handleDragStart(e, s.type)} className={`h-12 border rounded-xl flex items-center justify-center text-2xl cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 text-zinc-400 hover:border-purple-500/50' : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-purple-500/50'}`} title={s.title}>
+                          {SYMBOL_LABELS[s.type]}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action Motion Tab */}
+                  {symbolLibraryTab === 'action-motion' && (
+                    <div className="grid grid-cols-4 gap-3">
+                      {/* Forward Motion */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'action-forward'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-red-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-red-500/50'}`} title={lang === 'zh' ? '前进：拖动到分镜上应用前进动作' : 'Forward: Drag to frame'}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14M15 9l4 3-4 3"/>
+                        </svg>
+                      </div>
+                      {/* Rotation */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'action-rotate'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-red-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-red-500/50'}`} title={lang === 'zh' ? '旋转：拖动到分镜上应用旋转动作' : 'Rotate: Drag to frame'}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5"/>
+                        </svg>
+                      </div>
+                      {/* Jump */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'action-jump'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-red-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-red-500/50'}`} title={lang === 'zh' ? '跳跃：拖动到分镜上应用跳跃动作' : 'Jump: Drag to frame'}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2v8M8 10c0-2.2 1.8-4 4-4s4 1.8 4 4M2 20h20"/>
+                        </svg>
+                      </div>
+                      {/* Flying */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'action-fly'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-red-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-red-500/50'}`} title={lang === 'zh' ? '飞行：拖动到分镜上应用飞行动作' : 'Fly: Drag to frame'}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 12h18M12 3v18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick Storyboard Tab */}
+                  {symbolLibraryTab === 'quick-storyboard' && (
+                    <div className="grid grid-cols-4 gap-3">
+                      {/* Three-View Generation - 三个面的立体线条 */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'quick-three-view'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-blue-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-blue-500/50'}`} title={lang === 'zh' ? '三视图：拖动到分镜上生成三视图' : 'Three-View: Drag to frame'}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {/* 立体方块 - 三个可见面 */}
+                          <path d="M3 10l7-5v12l-7 5z"/><path d="M10 5l9 5v12l-9-5z"/><path d="M10 17l9 5v-5l-9-5z"/>
+                        </svg>
+                      </div>
+                      {/* Multi-Grid Generation - 四宫格的线条 */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'quick-multi-grid'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-blue-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-blue-500/50'}`} title={lang === 'zh' ? '多格布局：拖动到分镜上生成多格布局' : 'Multi-Grid: Drag to frame'}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {/* 2x2 四宫格 */}
+                          <rect x="2" y="2" width="8" height="8"/><rect x="12" y="2" width="8" height="8"/><rect x="2" y="12" width="8" height="8"/><rect x="12" y="12" width="8" height="8"/>
+                        </svg>
+                      </div>
+                      {/* Style Comparison - 调色盘 */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'quick-style-comparison'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-blue-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-blue-500/50'}`} title={lang === 'zh' ? '多风格：拖动到分镜上生成多风格' : 'Multi-Style: Drag to frame'}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {/* 调色盘 */}
+                          <circle cx="12" cy="12" r="9"/><circle cx="7" cy="8" r="2" fill="#3b82f6"/><circle cx="12" cy="5" r="2" fill="#3b82f6"/><circle cx="17" cy="8" r="2" fill="#3b82f6"/><circle cx="15" cy="15" r="2" fill="#3b82f6"/><circle cx="9" cy="15" r="2" fill="#3b82f6"/>
+                        </svg>
+                      </div>
+                      {/* Narrative Progression - 摄像机线条 */}
+                      <div draggable onDragStart={e => { e.dataTransfer.setData('symbolName', 'quick-narrative-progression'); }} className={`h-12 border rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-blue-500/50' : 'bg-zinc-50 border-zinc-200 hover:border-blue-500/50'}`} title={lang === 'zh' ? '叙事进展：拖动到分镜上生成叙事进展' : 'Narrative Progression: Drag to frame'}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {/* 摄像机 */}
+                          <rect x="2" y="5" width="14" height="11" rx="1"/><path d="M16 8l5-3v11l-5-3"/><circle cx="9" cy="10.5" r="3"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                 </section>
 
                 <section className="space-y-4 pt-4">
@@ -335,7 +454,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   </div>
                 </section>
               </div>
-            ) : (
+            ) : activeTab === 'chat' ? (
               <div className="h-full flex flex-col gap-0 overflow-hidden">
                 <div className="space-y-2 p-4 border-b flex-shrink-0" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#e5e7eb' }}>
                   <h3 className="text-xs font-black uppercase tracking-widest opacity-50">{lang === 'zh' ? '生成配置' : 'Generation Config'}</h3>
@@ -414,10 +533,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                         <div className="flex-1">
                           <p className="font-black uppercase mb-3">💡 {lang === 'zh' ? '创意对话模式' : 'Creative Chat Mode'}</p>
                           <div className="space-y-2">
-                            <p>✓ {lang === 'zh' ? '1. 输入您的创意想法或场景描述' : '1. Enter your creative idea or scene'}</p>
-                            <p>✓ {lang === 'zh' ? '2. 与 AI 对话补充细节和要求' : '2. Chat with AI to add details'}</p>
-                            <p>✓ {lang === 'zh' ? '3. 设置分镜数量、风格、比例' : '3. Set frame count, style, ratio'}</p>
-                            <p>✓ {lang === 'zh' ? '4. 点击"生成分镜"创建图片' : '4. Click "Generate Storyboard"'}</p>
+                            <p>{lang === 'zh' ? '输入你的想法，AI将根据上下文自动总结成脚本' : 'Enter your idea, AI will automatically summarize it into a script based on context'}</p>
                           </div>
                         </div>
                         <button
@@ -500,7 +616,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   {isLoading ? (lang === 'zh' ? '生成中...' : 'Generating...') : (lang === 'zh' ? '生成分镜' : 'Generate Storyboard')}
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

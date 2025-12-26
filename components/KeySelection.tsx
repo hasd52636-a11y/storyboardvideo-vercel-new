@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { ModelProvider, ProviderConfig, I18N, Language, Theme } from '../types';
 import { testApiConnection } from '../geminiService';
 
+declare global {
+  interface Window {
+    aistudio?: {
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 interface KeySelectionProps {
   onSuccess: () => void;
   lang: Language;
@@ -10,41 +18,89 @@ interface KeySelectionProps {
   onThemeChange?: (theme: Theme) => void;
 }
 
-const PROVIDERS = [
-  { id: 'gemini', name: 'Gemini (Official)', logo: '✨' },
-  { id: 'zhipu', name: '智谱 AI (ChatGLM)', logo: '🧠' },
-  { id: 'openai', name: 'OpenAI', logo: '🤖' },
-  { id: 'custom', name: 'Third-party (Custom)', logo: '🛠️' },
-];
-
-const PROVIDER_CONFIG: Record<string, { baseUrl: string; llmModel: string; imageModel: string }> = {
-  zhipu: {
+const IMAGE_PROVIDERS = [
+  { 
+    id: 'gemini', 
+    name: 'Gemini (Official)', 
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+    llmModel: 'gemini-2.0-flash',
+    imageModel: 'gemini-2.0-flash',
+    isOfficial: true
+  },
+  { 
+    id: 'shenma', 
+    name: '神马 API (官方)', 
+    baseUrl: 'https://api.whatai.cc',
+    llmModel: 'gpt-4o',
+    imageModel: 'nano-banana'
+  },
+  { 
+    id: 'shenma-us', 
+    name: '神马 API (美国线路)', 
+    baseUrl: 'https://api.gptbest.vip',
+    llmModel: 'gpt-4o',
+    imageModel: 'nano-banana'
+  },
+  { 
+    id: 'shenma-hk', 
+    name: '神马 API (香港线路)', 
+    baseUrl: 'https://hk-api.gptbest.vip',
+    llmModel: 'gpt-4o',
+    imageModel: 'nano-banana'
+  },
+  { 
+    id: 'zhipu', 
+    name: '智谱 AI (ChatGLM)', 
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     llmModel: 'glm-4',
     imageModel: 'cogview-4-250304'
   },
-  openai: {
+  { 
+    id: 'openai', 
+    name: 'OpenAI', 
     baseUrl: 'https://api.openai.com/v1',
     llmModel: 'gpt-4o',
     imageModel: 'dall-e-3'
   },
-  custom: {
-    baseUrl: 'https://api.example.com/v1',
-    llmModel: 'model-name',
-    imageModel: 'image-model-name'
-  }
-};
+  { 
+    id: 'custom', 
+    name: 'Custom API', 
+    baseUrl: '',
+    llmModel: '',
+    imageModel: ''
+  },
+];
 
-const VIDEO_API_PROVIDERS = [
+const VIDEO_PROVIDERS = [
   {
-    name: '神马 API',
-    url: 'https://api.shenma.com',
-    description: 'Sora 2 视频生成 API 中转服务'
+    id: 'shenma',
+    name: '神马 (官方)',
+    baseUrl: 'https://api.whatai.cc/',
+    docUrl: 'https://api.whatai.cc/'
   },
   {
-    name: 'OpenAI',
-    url: 'https://platform.openai.com/account/api-keys',
-    description: 'OpenAI API 密钥管理'
+    id: 'shenma-us',
+    name: '神马 (美国线路)',
+    baseUrl: 'https://api.gptbest.vip/',
+    docUrl: 'https://api.gptbest.vip/'
+  },
+  {
+    id: 'shenma-hk',
+    name: '神马 (香港线路)',
+    baseUrl: 'https://hk-api.gptbest.vip/',
+    docUrl: 'https://hk-api.gptbest.vip/'
+  },
+  {
+    id: 'dayangyu',
+    name: '大洋芋',
+    baseUrl: 'https://api.dyuapi.com/',
+    docUrl: 'https://api.dyuapi.com/'
+  },
+  {
+    id: 'custom-video',
+    name: 'Custom Video API',
+    baseUrl: '',
+    docUrl: ''
   }
 ];
 
@@ -60,6 +116,7 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
   });
   
   const [videoConfig, setVideoConfig] = useState({
+    provider: 'shenma',
     baseUrl: '',
     apiKey: ''
   });
@@ -129,7 +186,9 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
 
     setVideoTestStatus('loading');
     try {
-      const response = await fetch(`${videoConfig.baseUrl}/v1/token/quota`, {
+      // 使用令牌查询地址测试连接
+      const tokenQueryUrl = 'https://usage.gptbest.vip/v1/token/quota';
+      const response = await fetch(tokenQueryUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${videoConfig.apiKey}`
@@ -217,7 +276,7 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                 : `${theme === 'dark' ? 'bg-white/5 border-white/10 text-zinc-400 hover:border-white/20' : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300'}`
             }`}
           >
-            🖼️ {selectedLang === 'zh' ? '图像生成 API' : 'Image API'}
+            🖼️ {selectedLang === 'zh' ? '对话及图像API' : 'Chat & Image API'}
           </button>
           <button
             onClick={() => setActiveTab('video')}
@@ -233,141 +292,138 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
 
         {/* 图像 API 配置 */}
         {activeTab === 'image' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-            <div className="space-y-6">
+          <div className="space-y-6 mb-10">
+            <div className="space-y-2">
               <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.provider}</label>
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
-                {PROVIDERS.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      const providerConfig = PROVIDER_CONFIG[p.id];
-                      setConfig({ 
-                        ...config, 
-                        provider: p.id as ModelProvider,
-                        ...(providerConfig && {
-                          baseUrl: providerConfig.baseUrl,
-                          llmModel: providerConfig.llmModel,
-                          imageModel: providerConfig.imageModel
-                        })
-                      });
-                    }}
-                    className={`p-4 rounded-2xl border text-left transition-all hover:scale-105 ${config.provider === p.id ? 'bg-purple-600/20 border-purple-500 text-purple-400' : `${theme === 'dark' ? 'bg-white/5 border-white/5 text-zinc-500 hover:border-white/20' : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:border-zinc-300'}`}`}
-                  >
-                    <div className="text-xl mb-1">{p.logo}</div>
-                    <div className="text-[10px] font-black uppercase leading-tight">{p.name}</div>
-                  </button>
+              <select
+                value={config.provider}
+                onChange={(e) => {
+                  const selectedProvider = IMAGE_PROVIDERS.find(p => p.id === e.target.value);
+                  if (selectedProvider) {
+                    setConfig({
+                      ...config,
+                      provider: e.target.value as ModelProvider,
+                      baseUrl: selectedProvider.baseUrl,
+                      llmModel: selectedProvider.llmModel,
+                      imageModel: selectedProvider.imageModel
+                    });
+                  }
+                }}
+                className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+              >
+                {IMAGE_PROVIDERS.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
 
-            <div className="space-y-6">
-              {config.provider === 'gemini' ? (
-                <div className="h-full flex flex-col justify-center space-y-4">
-                   <p className={`text-sm leading-relaxed font-bold ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                     Use the built-in Gemini high-performance engine. Fast, reliable, and cinematic.
-                   </p>
-                   <button
-                     onClick={handleOfficialGemini}
-                     className="w-full py-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] transition-all"
-                   >
-                     Connect Official Key
-                   </button>
-                </div>
-              ) : (
-                <div className="space-y-5 animate-in fade-in duration-300">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t.apiKey}</label>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={config.apiKey}
-                        onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                        placeholder="sk-..."
-                        className={`w-full rounded-xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className={`absolute right-4 top-1/2 -translate-y-1/2 text-lg transition-opacity hover:opacity-70 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}
-                        title={selectedLang === 'zh' ? (showApiKey ? '隐藏密钥' : '显示密钥') : (showApiKey ? 'Hide key' : 'Show key')}
-                      >
-                        {showApiKey ? '👁️' : '👁️‍🗨️'}
-                      </button>
-                    </div>
+            {config.provider === 'gemini' ? (
+              <div className="space-y-4">
+                <p className={`text-sm leading-relaxed font-bold ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                  {selectedLang === 'zh' ? '使用内置的 Gemini 高性能引擎。快速、可靠、电影级效果。' : 'Use the built-in Gemini high-performance engine. Fast, reliable, and cinematic.'}
+                </p>
+                <button
+                  onClick={handleOfficialGemini}
+                  className="w-full py-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] transition-all"
+                >
+                  {selectedLang === 'zh' ? '连接官方密钥' : 'Connect Official Key'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5 animate-in fade-in duration-300">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{t.apiKey}</label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={config.apiKey}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, apiKey: e.target.value })}
+                      placeholder="sk-..."
+                      className={`w-full rounded-xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 text-lg transition-opacity hover:opacity-70 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-600'}`}
+                      title={selectedLang === 'zh' ? (showApiKey ? '隐藏密钥' : '显示密钥') : (showApiKey ? 'Hide key' : 'Show key')}
+                    >
+                      {showApiKey ? '👁️' : '👁️‍🗨️'}
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                      {t.baseUrl}
-                      {config.provider === 'zhipu' && (
-                        <a
-                          href="https://open.bigmodel.cn"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="智谱 AI 官网"
-                          className="inline-flex items-center justify-center w-4 h-4 bg-blue-500 text-white rounded-full text-[8px] font-bold hover:bg-blue-600 transition-colors"
-                        >
-                          ?
-                        </a>
-                      )}
-                      {config.provider === 'openai' && (
-                        <a
-                          href="https://platform.openai.com/account/api-keys"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="OpenAI API 密钥"
-                          className="inline-flex items-center justify-center w-4 h-4 bg-green-500 text-white rounded-full text-[8px] font-bold hover:bg-green-600 transition-colors"
-                        >
-                          ?
-                        </a>
-                      )}
-                    </label>
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                    {t.baseUrl}
+                    {config.provider === 'zhipu' && (
+                      <a
+                        href="https://open.bigmodel.cn"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="智谱 AI 官网"
+                        className="inline-flex items-center justify-center w-4 h-4 bg-blue-500 text-white rounded-full text-[8px] font-bold hover:bg-blue-600 transition-colors"
+                      >
+                        ?
+                      </a>
+                    )}
+                    {config.provider === 'openai' && (
+                      <a
+                        href="https://platform.openai.com/account/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="OpenAI API 密钥"
+                        className="inline-flex items-center justify-center w-4 h-4 bg-green-500 text-white rounded-full text-[8px] font-bold hover:bg-green-600 transition-colors"
+                      >
+                        ?
+                      </a>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    value={config.baseUrl}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, baseUrl: e.target.value })}
+                    className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">LLM {t.model}</label>
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      value={config.baseUrl}
-                      onChange={(e) => setConfig({ ...config, baseUrl: e.target.value })}
-                      className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+                      value={config.llmModel}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, llmModel: e.target.value })}
+                      placeholder="glm-4 / gpt-4o"
+                      className={`flex-1 rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">LLM {t.model}</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={config.llmModel}
-                        onChange={(e) => setConfig({ ...config, llmModel: e.target.value })}
-                        placeholder="glm-4 / gpt-4o"
-                        className={`flex-1 rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-                      />
-                      <button
-                        onClick={() => runApiTest('llm')}
-                        className={`px-3 py-2 rounded-lg font-bold text-[10px] tracking-widest transition-all min-w-[60px] ${testStatus.llm === 'loading' ? 'bg-yellow-600 text-white' : testStatus.llm === 'success' ? 'bg-green-600 text-white' : `${theme === 'dark' ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20' : 'bg-zinc-100 border border-zinc-300 text-black hover:bg-zinc-200'}`}`}
-                      >
-                        {testStatus.llm === 'loading' ? '...' : testStatus.llm === 'success' ? '✓' : 'Test'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Image {t.model}</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={config.imageModel}
-                        onChange={(e) => setConfig({ ...config, imageModel: e.target.value })}
-                        placeholder="cogview-4-250304 / dall-e-3"
-                        className={`flex-1 rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
-                      />
-                      <button
-                        onClick={() => runApiTest('image')}
-                        className={`px-3 py-2 rounded-lg font-bold text-[10px] tracking-widest transition-all min-w-[60px] ${testStatus.image === 'loading' ? 'bg-yellow-600 text-white' : testStatus.image === 'success' ? 'bg-green-600 text-white' : `${theme === 'dark' ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20' : 'bg-zinc-100 border border-zinc-300 text-black hover:bg-zinc-200'}`}`}
-                      >
-                        {testStatus.image === 'loading' ? '...' : testStatus.image === 'success' ? '✓' : 'Test'}
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => runApiTest('llm')}
+                      className={`px-3 py-2 rounded-lg font-bold text-[10px] tracking-widest transition-all min-w-[60px] ${testStatus.llm === 'loading' ? 'bg-yellow-600 text-white' : testStatus.llm === 'success' ? 'bg-green-600 text-white' : `${theme === 'dark' ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20' : 'bg-zinc-100 border border-zinc-300 text-black hover:bg-zinc-200'}`}`}
+                    >
+                      {testStatus.llm === 'loading' ? '...' : testStatus.llm === 'success' ? '✓' : 'Test'}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Image {t.model}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={config.imageModel}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, imageModel: e.target.value })}
+                      placeholder="cogview-4-250304 / dall-e-3"
+                      className={`flex-1 rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+                    />
+                    <button
+                      onClick={() => runApiTest('image')}
+                      className={`px-3 py-2 rounded-lg font-bold text-[10px] tracking-widest transition-all min-w-[60px] ${testStatus.image === 'loading' ? 'bg-yellow-600 text-white' : testStatus.image === 'success' ? 'bg-green-600 text-white' : `${theme === 'dark' ? 'bg-white/10 border border-white/20 text-white hover:bg-white/20' : 'bg-zinc-100 border border-zinc-300 text-black hover:bg-zinc-200'}`}`}
+                    >
+                      {testStatus.image === 'loading' ? '...' : testStatus.image === 'success' ? '✓' : 'Test'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -375,31 +431,50 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
         {activeTab === 'video' && (
           <div className="space-y-6 mb-10">
             <div className="space-y-2">
+              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{t.provider}</label>
+              <select
+                value={videoConfig.provider || 'shenma'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const selectedProvider = VIDEO_PROVIDERS.find(p => p.id === e.target.value);
+                  if (selectedProvider) {
+                    setVideoConfig({
+                      ...videoConfig,
+                      provider: e.target.value as any,
+                      baseUrl: selectedProvider.baseUrl
+                    });
+                  }
+                }}
+                className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'}`}
+              >
+                {VIDEO_PROVIDERS.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
               <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
                 Base URL
-                <div className="flex gap-2">
-                  {VIDEO_API_PROVIDERS.map((provider) => (
-                    <a
-                      key={provider.name}
-                      href={provider.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={provider.description}
-                      className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8px] font-bold transition-all hover:scale-125 ${
-                        theme === 'dark'
-                          ? 'bg-purple-500 text-white hover:bg-purple-600'
-                          : 'bg-purple-500 text-white hover:bg-purple-600'
-                      }`}
-                    >
-                      🔗
-                    </a>
-                  ))}
-                </div>
+                <a
+                  href={VIDEO_PROVIDERS.find(p => p.id === (videoConfig.provider || 'shenma'))?.docUrl || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="API Documentation"
+                  className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[8px] font-bold transition-all hover:scale-125 ${
+                    theme === 'dark'
+                      ? 'bg-purple-500 text-white hover:bg-purple-600'
+                      : 'bg-purple-500 text-white hover:bg-purple-600'
+                  }`}
+                >
+                  ?
+                </a>
               </label>
               <input
                 type="text"
                 value={videoConfig.baseUrl}
-                onChange={(e) => setVideoConfig({ ...videoConfig, baseUrl: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVideoConfig({ ...videoConfig, baseUrl: e.target.value })}
                 placeholder="https://api.xxx.com"
                 className={`w-full rounded-xl px-5 py-4 text-sm font-bold outline-none focus:border-purple-500/50 border ${
                   theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'
@@ -416,7 +491,7 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                 <input
                   type={showVideoApiKey ? 'text' : 'password'}
                   value={videoConfig.apiKey}
-                  onChange={(e) => setVideoConfig({ ...videoConfig, apiKey: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVideoConfig({ ...videoConfig, apiKey: e.target.value })}
                   placeholder="sk-xxx..."
                   className={`w-full rounded-xl px-5 py-4 pr-12 text-sm font-bold outline-none focus:border-purple-500/50 border ${
                     theme === 'dark' ? 'bg-white/5 border-white/5 text-white' : 'bg-zinc-50 border-zinc-200 text-black'

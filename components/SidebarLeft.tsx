@@ -83,15 +83,13 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <button 
-          onClick={onSettings} 
-          title={lang === 'zh' ? 'API 接口配置\n设置 AI 模型和 API 密钥' : 'API Configuration\nSet up AI models and API keys'}
-          className="w-14 h-14 flex items-center justify-center rounded-2xl text-zinc-500 hover:text-purple-500 transition-all"
-        >
-          ⚙️
-        </button>
-      </div>
+      <button 
+        onClick={onSettings} 
+        title={lang === 'zh' ? 'API 接口配置\n设置 AI 模型和视频 API' : 'API Configuration\nSet up AI models and video API'}
+        className="w-14 h-14 flex items-center justify-center rounded-2xl text-zinc-500 hover:text-purple-500 transition-all"
+      >
+        ⚙️
+      </button>
 
       <div className={`h-[2px] w-8 ${theme === 'dark' ? 'bg-white/10' : 'bg-zinc-100'}`}></div>
 

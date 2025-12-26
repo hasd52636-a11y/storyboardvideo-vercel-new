@@ -10,19 +10,74 @@ import {
   CreateCharacterOptions
 } from './types';
 
-class VideoService {
-  private config: VideoServiceConfig;
-  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+export type VideoAPIProvider = 'openai' | 'dyu';
 
-  constructor(config: VideoServiceConfig) {
+export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
+  provider?: VideoAPIProvider;
+}
+
+class VideoService {
+  private config: VideoServiceConfigWithProvider;
+  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private provider: VideoAPIProvider;
+
+  constructor(config: VideoServiceConfigWithProvider) {
     this.config = config;
+    this.provider = config.provider || 'openai';
   }
 
-  private buildHeaders(): HeadersInit {
+  setProvider(provider: VideoAPIProvider): void {
+    this.provider = provider;
+  }
+
+  getProvider(): VideoAPIProvider {
+    return this.provider;
+  }
+
+  private buildHeaders(contentType: string = 'application/json'): HeadersInit {
     return {
       'Authorization': `Bearer ${this.config.apiKey}`,
-      'Content-Type': 'application/json'
+      'Content-Type': contentType
     };
+  }
+
+  private getEndpoint(action: string): string {
+    if (this.provider === 'dyu') {
+      return this.getDYUEndpoint(action);
+    }
+    return this.getOpenAIEndpoint(action);
+  }
+
+  private getOpenAIEndpoint(action: string): string {
+    const baseUrl = this.config.baseUrl.replace(/\/$/, '');
+    switch (action) {
+      case 'create':
+        return `${baseUrl}/v2/videos/generations`;
+      case 'status':
+        return `${baseUrl}/v2/videos/generations`;
+      case 'quota':
+        return `${baseUrl}/v1/token/quota`;
+      case 'character':
+        return `${baseUrl}/sora/v1/characters`;
+      default:
+        return baseUrl;
+    }
+  }
+
+  private getDYUEndpoint(action: string): string {
+    const baseUrl = this.config.baseUrl.replace(/\/$/, '');
+    switch (action) {
+      case 'create':
+        return `${baseUrl}/v1/videos`;
+      case 'status':
+        return `${baseUrl}/v1/videos`;
+      case 'quota':
+        return `${baseUrl}/v1/token/quota`;
+      case 'character':
+        return `${baseUrl}/v1/videos`;
+      default:
+        return baseUrl;
+    }
   }
 
   async createVideo(
@@ -30,125 +85,288 @@ class VideoService {
     options: CreateVideoOptions
   ): Promise<{ task_id: string; status: string; progress: string }> {
     try {
-      const endpoint = `${this.config.baseUrl}/v2/videos/generations`;
-
-      const body: any = {
-        model: options.model,
-        prompt: prompt,
-        aspect_ratio: options.aspect_ratio || '16:9',
-        duration: options.duration || 10,
-        hd: options.hd || false,
-        watermark: options.watermark ?? false,
-        private: options.private ?? false
-      };
-
-      if (options.images && options.images.length > 0) {
-        body.images = options.images;
+      if (this.provider === 'dyu') {
+        return this.createVideoDYU(prompt, options);
       }
-
-      if (options.notify_hook) {
-        body.notify_hook = options.notify_hook;
-      }
-
-      if (options.character_url) {
-        body.character_url = options.character_url;
-      }
-
-      if (options.character_timestamps) {
-        body.character_timestamps = options.character_timestamps;
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: this.buildHeaders(),
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      const data = JSON.parse(responseText);
-
-      return {
-        task_id: data.task_id,
-        status: data.status || 'SUBMITTED',
-        progress: data.progress || '0%'
-      };
+      return this.createVideoOpenAI(prompt, options);
     } catch (error) {
       console.error('Video creation error:', error);
       throw error;
     }
   }
 
+  private async createVideoOpenAI(
+    prompt: string,
+    options: CreateVideoOptions
+  ): Promise<{ task_id: string; status: string; progress: string }> {
+    const endpoint = this.getOpenAIEndpoint('create');
+
+    const body: any = {
+      model: options.model,
+      prompt: prompt,
+      aspect_ratio: options.aspect_ratio || '16:9',
+      duration: options.duration || 10,
+      hd: options.hd || false,
+      watermark: options.watermark ?? false,
+      private: options.private ?? false
+    };
+
+    if (options.images && options.images.length > 0) {
+      body.images = options.images;
+    }
+
+    if (options.notify_hook) {
+      body.notify_hook = options.notify_hook;
+    }
+
+    if (options.character_url) {
+      body.character_url = options.character_url;
+    }
+
+    if (options.character_timestamps) {
+      body.character_timestamps = options.character_timestamps;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: this.buildHeaders(),
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      task_id: data.task_id,
+      status: data.status || 'SUBMITTED',
+      progress: data.progress || '0%'
+    };
+  }
+
+  private async createVideoDYU(
+    prompt: string,
+    options: CreateVideoOptions
+  ): Promise<{ task_id: string; status: string; progress: string }> {
+    const endpoint = this.getDYUEndpoint('create');
+
+    // DYU API 使用不同的参数格式
+    const body: any = {
+      model: this.mapModelToDYU(options.model),
+      prompt: prompt
+    };
+
+    // 处理风格参数
+    if (options.style) {
+      body.style = options.style;
+    }
+
+    // 处理图片参数
+    if (options.images && options.images.length > 0) {
+      body.image_url = options.images[0]; // DYU API 只支持单个图片 URL
+    }
+
+    // 处理故事板参数
+    if (options.storyboard) {
+      body.storyboard = true;
+    }
+
+    // 处理水印参数
+    if (options.watermark === false) {
+      body.trim = true; // DYU API 的 trim 参数用于去首帧水印
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: this.buildHeaders(),
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      task_id: data.id || data.task_id,
+      status: data.status || 'queued',
+      progress: data.progress ? `${data.progress}%` : '0%'
+    };
+  }
+
+  private mapModelToDYU(model: string): string {
+    // 将 OpenAI 模型名称映射到 DYU API 模型名称
+    const modelMap: Record<string, string> = {
+      'sora-2': 'sora2-landscape',
+      'sora-2-pro': 'sora2-pro-landscape-25s'
+    };
+    return modelMap[model] || model;
+  }
+
+  private mapModelFromDYU(model: string): string {
+    // 将 DYU API 模型名称映射回 OpenAI 模型名称
+    if (model.includes('pro')) {
+      return 'sora-2-pro';
+    }
+    return 'sora-2';
+  }
+
   async getVideoStatus(taskId: string): Promise<VideoStatus> {
     try {
-      const endpoint = `${this.config.baseUrl}/v2/videos/generations/${taskId}`;
-
-      const myHeaders = new Headers();
-      myHeaders.append('Authorization', `Bearer ${this.config.apiKey}`);
-
-      const requestOptions = {
-        method: 'GET',
-        headers: myHeaders,
-        redirect: 'follow' as RequestRedirect
-      };
-
-      const response = await fetch(endpoint, requestOptions);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
+      if (this.provider === 'dyu') {
+        return this.getVideoStatusDYU(taskId);
       }
-
-      const responseText = await response.text();
-      const data = JSON.parse(responseText);
-
-      return {
-        task_id: data.task_id,
-        status: data.status || 'IN_PROGRESS',
-        progress: data.progress || '0%',
-        submit_time: data.submit_time,
-        start_time: data.start_time,
-        finish_time: data.finish_time,
-        fail_reason: data.fail_reason,
-        video_url: data.data?.output || data.video_url,
-        error: data.error
-      };
+      return this.getVideoStatusOpenAI(taskId);
     } catch (error) {
       console.error('Get video status error:', error);
       throw error;
     }
   }
 
+  private async getVideoStatusOpenAI(taskId: string): Promise<VideoStatus> {
+    const endpoint = `${this.getOpenAIEndpoint('status')}/${taskId}`;
+
+    const myHeaders = new Headers();
+    myHeaders.append('Authorization', `Bearer ${this.config.apiKey}`);
+
+    const requestOptions = {
+      method: 'GET',
+      headers: myHeaders,
+      redirect: 'follow' as RequestRedirect
+    };
+
+    const response = await fetch(endpoint, requestOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      task_id: data.task_id,
+      status: data.status || 'IN_PROGRESS',
+      progress: data.progress || '0%',
+      submit_time: data.submit_time,
+      start_time: data.start_time,
+      finish_time: data.finish_time,
+      fail_reason: data.fail_reason,
+      video_url: data.data?.output || data.video_url,
+      error: data.error
+    };
+  }
+
+  private async getVideoStatusDYU(taskId: string): Promise<VideoStatus> {
+    const endpoint = `${this.getDYUEndpoint('status')}/${taskId}`;
+
+    const myHeaders = new Headers();
+    myHeaders.append('Authorization', `Bearer ${this.config.apiKey}`);
+
+    const requestOptions = {
+      method: 'GET',
+      headers: myHeaders,
+      redirect: 'follow' as RequestRedirect
+    };
+
+    const response = await fetch(endpoint, requestOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    // 映射 DYU API 的响应格式到统一的 VideoStatus 格式
+    const statusMap: Record<string, string> = {
+      'queued': 'NOT_START',
+      'in_progress': 'IN_PROGRESS',
+      'completed': 'SUCCESS',
+      'failed': 'FAILURE'
+    };
+
+    return {
+      task_id: data.id || taskId,
+      status: statusMap[data.status] || data.status,
+      progress: data.progress ? `${data.progress}%` : '0%',
+      created_at: data.created_at,
+      submit_time: data.created_at,
+      start_time: data.created_at,
+      finish_time: data.completed_at,
+      model: this.mapModelFromDYU(data.model || ''),
+      size: data.size,
+      video_url: data.video_url || data.url,
+      fail_reason: data.error?.message,
+      error: data.error
+    };
+  }
+
   async getTokenQuota(): Promise<TokenQuota> {
     try {
-      const endpoint = `${this.config.baseUrl}/v1/token/quota`;
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: this.buildHeaders()
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
+      if (this.provider === 'dyu') {
+        return this.getTokenQuotaDYU();
       }
-
-      const responseText = await response.text();
-      const data = JSON.parse(responseText);
-
-      return {
-        total_quota: data.total_quota || 0,
-        used_quota: data.used_quota || 0,
-        remaining_quota: data.remaining_quota || 0
-      };
+      return this.getTokenQuotaOpenAI();
     } catch (error) {
       console.error('Get token quota error:', error);
       throw error;
     }
+  }
+
+  private async getTokenQuotaOpenAI(): Promise<TokenQuota> {
+    const endpoint = this.getOpenAIEndpoint('quota');
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: this.buildHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      total_quota: data.total_quota || 0,
+      used_quota: data.used_quota || 0,
+      remaining_quota: data.remaining_quota || 0
+    };
+  }
+
+  private async getTokenQuotaDYU(): Promise<TokenQuota> {
+    const endpoint = this.getDYUEndpoint('quota');
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: this.buildHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      total_quota: data.total_quota || 0,
+      used_quota: data.used_quota || 0,
+      remaining_quota: data.remaining_quota || 0
+    };
   }
 
   // 获取配额百分比
@@ -177,48 +395,95 @@ class VideoService {
   // 创建角色
   async createCharacter(options: CreateCharacterOptions): Promise<Character> {
     try {
-      if (!options.url && !options.from_task) {
-        throw new Error('Either url or from_task must be provided');
+      if (this.provider === 'dyu') {
+        return this.createCharacterDYU(options);
       }
-
-      const endpoint = `${this.config.baseUrl}/sora/v1/characters`;
-
-      const body: any = {
-        timestamps: options.timestamps
-      };
-
-      if (options.url) {
-        body.url = options.url;
-      }
-
-      if (options.from_task) {
-        body.from_task = options.from_task;
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: this.buildHeaders(),
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      const data = JSON.parse(responseText);
-
-      return {
-        id: data.id,
-        username: data.username,
-        permalink: data.permalink,
-        profile_picture_url: data.profile_picture_url
-      };
+      return this.createCharacterOpenAI(options);
     } catch (error) {
       console.error('Create character error:', error);
       throw error;
     }
+  }
+
+  private async createCharacterOpenAI(options: CreateCharacterOptions): Promise<Character> {
+    if (!options.url && !options.from_task) {
+      throw new Error('Either url or from_task must be provided');
+    }
+
+    const endpoint = this.getOpenAIEndpoint('character');
+
+    const body: any = {
+      timestamps: options.timestamps
+    };
+
+    if (options.url) {
+      body.url = options.url;
+    }
+
+    if (options.from_task) {
+      body.from_task = options.from_task;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: this.buildHeaders(),
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      id: data.id,
+      username: data.username,
+      permalink: data.permalink,
+      profile_picture_url: data.profile_picture_url
+    };
+  }
+
+  private async createCharacterDYU(options: CreateCharacterOptions): Promise<Character> {
+    // DYU API 的角色创建使用不同的端点和参数格式
+    const endpoint = `${this.getDYUEndpoint('character')}`;
+
+    const body: any = {
+      model: 'character-training',
+      prompt: 'character creation',
+      timestamps: options.timestamps
+    };
+
+    if (options.url) {
+      body.url = options.url;
+    }
+
+    if (options.from_task) {
+      body.character = options.from_task;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: this.buildHeaders(),
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      id: data.id,
+      username: data.id, // DYU API 可能不返回 username
+      permalink: '',
+      profile_picture_url: ''
+    };
   }
 
   // 创建故事板视频

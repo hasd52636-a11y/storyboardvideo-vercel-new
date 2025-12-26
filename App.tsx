@@ -11,6 +11,7 @@ import VideoGenDialog from './components/VideoGenDialog';
 import VideoEditDialog from './components/VideoEditDialog';
 import VideoWindow from './components/VideoWindow';
 import HelpModal from './components/HelpModal';
+import QuickStoryboardConfigDialog from './components/QuickStoryboardConfigDialog';
 import VideoService from './videoService';
 
 interface HelpSection {
@@ -52,6 +53,12 @@ const App: React.FC = () => {
   const [selectionRect, setSelectionRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
   const selectionStart = useRef<{ x: number, y: number } | null>(null);
 
+  // Quick Storyboard Config Dialog State
+  const [showQuickStoryboardConfig, setShowQuickStoryboardConfig] = useState(false);
+  const [quickStoryboardActionType, setQuickStoryboardActionType] = useState<'multi-grid' | 'narrative-progression' | null>(null);
+  const [quickStoryboardItemId, setQuickStoryboardItemId] = useState<string | null>(null);
+  const [quickStoryboardFrameCount, setQuickStoryboardFrameCount] = useState(4);
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const importTypeRef = useRef<'ref' | 'frame'>('frame');
@@ -75,6 +82,13 @@ const App: React.FC = () => {
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
     localStorage.setItem('director_canvas_theme', newTheme);
+  };
+
+  const handleAPIConfigured = (config: { baseUrl: string; apiKey: string; provider: any }) => {
+    // Save config to localStorage
+    localStorage.setItem('director_canvas_video_config', JSON.stringify(config));
+    // Initialize VideoService with the new config
+    videoServiceRef.current = new VideoService(config);
   };
 
   useEffect(() => {
@@ -546,10 +560,11 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // CORS 代理列表
+      // CORS 代理列表 - 按优先级排序
       const CORS_PROXIES = [
         'https://cors.bridged.cc/',
-        'https://api.allorigins.win/raw?url='
+        'https://api.allorigins.win/raw?url=',
+        'https://proxy.cors.sh/?url='
       ];
       
       // 获取 CORS 代理 URL
@@ -557,6 +572,9 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         if (proxyIndex >= CORS_PROXIES.length) return url;
         const proxy = CORS_PROXIES[proxyIndex];
         if (proxy.includes('allorigins')) {
+          return `${proxy}${encodeURIComponent(url)}`;
+        }
+        if (proxy.includes('cors.sh')) {
           return `${proxy}${encodeURIComponent(url)}`;
         }
         return `${proxy}${url}`;
@@ -572,24 +590,27 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             img.crossOrigin = "anonymous";
           }
           
+          // 根据尝试次数调整超时时间
+          const baseTimeout = 20000; // 20 秒基础超时
           const timeout = setTimeout(() => {
-            console.warn(`Image load timeout: ${url.substring(0, 50)}`);
+            console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
             // 尝试下一个代理
             if (proxyIndex < CORS_PROXIES.length) {
-              const proxyUrl = getCorsProxyUrl(url, proxyIndex);
-              console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
+              console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
               loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
             } else {
+              console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
               resolve(false);
             }
-          }, 15000);
+          }, baseTimeout);
           
           img.onload = () => {
             clearTimeout(timeout);
             try {
               if (img.width > 0 && img.height > 0) {
                 ctx.drawImage(img, x, y, w, h);
-                console.log(`✓ Image drawn successfully: ${url.substring(0, 50)}`);
+                const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
+                console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                 resolve(true);
               } else {
                 console.warn('Image loaded but has zero dimensions');
@@ -603,21 +624,28 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           
           img.onerror = () => {
             clearTimeout(timeout);
-            console.warn(`Image load failed: ${url.substring(0, 50)}`);
+            console.warn(`Image load failed (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
             
             // 尝试下一个代理
             if (proxyIndex < CORS_PROXIES.length) {
-              const proxyUrl = getCorsProxyUrl(url, proxyIndex);
-              console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
+              console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
               loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
             } else {
               // 所有代理都失败了，返回 false
+              console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
               resolve(false);
             }
           };
           
           // 使用代理 URL 或原始 URL
-          const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+          let loadUrl: string;
+          if (proxyIndex === 0) {
+            loadUrl = url;
+          } else {
+            loadUrl = getCorsProxyUrl(url, proxyIndex - 1);
+          }
+          
+          console.log(`Loading image (attempt ${proxyIndex + 1}): ${loadUrl.substring(0, 80)}...`);
           img.src = loadUrl;
         });
       };
@@ -817,10 +845,224 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
   const handleDropSymbol = (itemId: string, symName: string, x: number, y: number) => {
     const item = items.find(it => it.id === itemId);
     if (item?.isMain) return;
+    
+    // Quick storyboard actions trigger generation immediately
+    if (symName.startsWith('quick-')) {
+      const actionType = symName.replace('quick-', '');
+      handleQuickStoryboardAction(itemId, actionType);
+      return;
+    }
+    
+    // Other symbols (camera motion, action motion) are added to the frame
     setItems(prev => prev.map(it => it.id === itemId ? {
       ...it,
       symbols: [...it.symbols, { id: crypto.randomUUID(), type: 'action', name: symName, label: SYMBOL_LABELS[symName], x, y, rotation: 0 }]
     } : it));
+  };
+
+  const handleQuickStoryboardAction = async (itemId: string, actionType: string) => {
+    const item = items.find(it => it.id === itemId);
+    if (!item || item.isMain) return;
+    
+    // For three-view and style-comparison, execute immediately
+    if (actionType === 'three-view' || actionType === 'style-comparison') {
+      setIsLoading(true);
+      try {
+        const { styleComparisonGenerator } = await import('./services/generators/StyleComparisonGenerator');
+        
+        if (actionType === 'three-view') {
+          // Generate three-view images (front, side, top views)
+          const threeViewPrompt = `Generate three orthographic views of the subject from the following image:
+[Reference Image]: ${item.imageUrl}
+[Subject Description]: ${item.description}
+
+Create exactly 3 views arranged horizontally:
+1. Front view (looking straight at the subject)
+2. Side view (looking from the right)
+3. Top view (looking down from above)
+
+Each view should be clear, detailed, and show the subject from that specific angle. Use consistent lighting and style across all three views.`;
+
+          const threeViewImages: string[] = [];
+          for (let i = 0; i < 3; i++) {
+            const viewUrl = await generateSceneImage(threeViewPrompt, true, item.colorMode === 'blackAndWhite', undefined, item.aspectRatio);
+            if (viewUrl) threeViewImages.push(viewUrl);
+          }
+
+          if (threeViewImages.length > 0) {
+            // Add generated images as new frames
+            const newItems: StoryboardItem[] = threeViewImages.map((url, idx) => ({
+              id: crypto.randomUUID(),
+              imageUrl: url,
+              prompt: threeViewPrompt,
+              description: `${item.description} - View ${idx + 1}`,
+              x: item.x + (idx + 1) * 440,
+              y: item.y,
+              width: item.width,
+              height: item.height,
+              isMain: false,
+              filter: FilterMode.LINE_ART,
+              order: items.length + idx,
+              symbols: [],
+              colorMode: item.colorMode,
+              aspectRatio: item.aspectRatio
+            }));
+            setItems(prev => [...prev, ...newItems]);
+          }
+        } else if (actionType === 'style-comparison') {
+          // Generate style comparison (5 different styles)
+          const selectedStyles = styleComparisonGenerator.selectDistinctStyles(5);
+          const styleComparisonImages: string[] = [];
+
+          for (const style of selectedStyles) {
+            const stylePrompt = `Generate the following subject in ${style} style:
+[Subject]: ${item.description}
+[Reference]: ${item.imageUrl}
+
+Create a single frame showing the subject rendered in ${style} artistic style. Maintain the composition and key elements from the reference, but apply the specific artistic style.`;
+
+            const styleImageUrl = await generateSceneImage(stylePrompt, true, item.colorMode === 'blackAndWhite', undefined, item.aspectRatio);
+            if (styleImageUrl) styleComparisonImages.push(styleImageUrl);
+          }
+
+          if (styleComparisonImages.length > 0) {
+            // Add generated images as new frames
+            const newItems: StoryboardItem[] = styleComparisonImages.map((url, idx) => ({
+              id: crypto.randomUUID(),
+              imageUrl: url,
+              prompt: `Style comparison - ${selectedStyles[idx]}`,
+              description: `${item.description} - ${selectedStyles[idx]}`,
+              x: item.x + (idx + 1) * 440,
+              y: item.y + 300,
+              width: item.width,
+              height: item.height,
+              isMain: false,
+              filter: FilterMode.LINE_ART,
+              order: items.length + idx,
+              symbols: [],
+              colorMode: item.colorMode,
+              aspectRatio: item.aspectRatio
+            }));
+            setItems(prev => [...prev, ...newItems]);
+          }
+        }
+      } catch (error) {
+        console.error('Quick storyboard action failed:', error);
+        alert(lang === 'zh' ? '快捷分镜生成失败' : 'Quick storyboard generation failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // For multi-grid and narrative-progression, show config dialog
+    if (actionType === 'multi-grid' || actionType === 'narrative-progression') {
+      setQuickStoryboardItemId(itemId);
+      setQuickStoryboardActionType(actionType as 'multi-grid' | 'narrative-progression');
+      setQuickStoryboardFrameCount(actionType === 'multi-grid' ? 4 : 5);
+      setShowQuickStoryboardConfig(true);
+    }
+  };
+
+  const handleQuickStoryboardConfirm = async (frameCount: number) => {
+    if (!quickStoryboardItemId || !quickStoryboardActionType) return;
+    
+    const item = items.find(it => it.id === quickStoryboardItemId);
+    if (!item || item.isMain) return;
+    
+    setShowQuickStoryboardConfig(false);
+    setIsLoading(true);
+    
+    try {
+      const { multiGridGenerator } = await import('./services/generators/MultiGridGenerator');
+      const { narrativeProgressionGenerator } = await import('./services/generators/NarrativeProgressionGenerator');
+      
+      if (quickStoryboardActionType === 'multi-grid') {
+        const gridDimensions = multiGridGenerator.calculateGridDimensions(frameCount);
+        
+        // Import optimized prompt template
+        const { multiGridPromptTemplate } = await import('./services/generators/MultiGridPromptTemplate');
+        
+        // Generate optimized prompt
+        const promptConfig = {
+          frameCount,
+          gridDimensions,
+          subject: item.description,
+          referenceImageUrl: item.imageUrl,
+          style: currentStyle?.name || 'cinematic',
+          colorMode: item.colorMode,
+          aspectRatio: item.aspectRatio || '16:9'
+        };
+        
+        const { prompt: multiGridPrompt } = multiGridPromptTemplate.generatePrompt(promptConfig, false);
+        const gridImageUrl = await generateSceneImage(multiGridPrompt, true, item.colorMode === 'blackAndWhite', undefined, item.aspectRatio);
+        
+        if (gridImageUrl) {
+          const newItem: StoryboardItem = {
+            id: crypto.randomUUID(),
+            imageUrl: gridImageUrl,
+            prompt: multiGridPrompt,
+            description: `${item.description} - ${gridDimensions} Grid`,
+            x: item.x + 440,
+            y: item.y,
+            width: item.width,
+            height: item.height,
+            isMain: false,
+            filter: FilterMode.LINE_ART,
+            order: items.length,
+            symbols: [],
+            colorMode: item.colorMode,
+            aspectRatio: item.aspectRatio
+          };
+          setItems(prev => [...prev, newItem]);
+        }
+      } else if (quickStoryboardActionType === 'narrative-progression') {
+        const narrativeImages: string[] = [];
+        
+        // Generate frames with 5-second intervals
+        for (let i = 1; i <= frameCount; i++) {
+          const timeCode = `${i * 5}s`;
+          const narrativePrompt = `Generate frame ${i} of ${frameCount} in a narrative progression sequence:
+[Subject]: ${item.description}
+[Reference]: ${item.imageUrl}
+[Time Code]: ${timeCode}
+[Frame Position]: Frame ${i} of ${frameCount}
+
+This is frame ${i} showing the progression of the narrative. Each frame should advance the story by approximately 5 seconds of screen time. Maintain visual continuity with previous frames and show clear progression toward the narrative goal.`;
+
+          const narrativeImageUrl = await generateSceneImage(narrativePrompt, true, item.colorMode === 'blackAndWhite', undefined, item.aspectRatio);
+          if (narrativeImageUrl) narrativeImages.push(narrativeImageUrl);
+        }
+
+        if (narrativeImages.length > 0) {
+          // Add generated images as new frames
+          const newItems: StoryboardItem[] = narrativeImages.map((url, idx) => ({
+            id: crypto.randomUUID(),
+            imageUrl: url,
+            prompt: `Narrative progression - Frame ${idx + 1}/${frameCount} (${(idx + 1) * 5}s)`,
+            description: `${item.description} - Frame ${idx + 1}/${frameCount}`,
+            x: item.x + (idx + 1) * 440,
+            y: item.y + 600,
+            width: item.width,
+            height: item.height,
+            isMain: false,
+            filter: FilterMode.LINE_ART,
+            order: items.length + idx,
+            symbols: [],
+            colorMode: item.colorMode,
+            aspectRatio: item.aspectRatio
+          }));
+          setItems(prev => [...prev, ...newItems]);
+        }
+      }
+    } catch (error) {
+      console.error('Quick storyboard action failed:', error);
+      alert(lang === 'zh' ? '快捷分镜生成失败' : 'Quick storyboard generation failed');
+    } finally {
+      setIsLoading(false);
+      setQuickStoryboardItemId(null);
+      setQuickStoryboardActionType(null);
+    }
   };
 
   const handleBatchRedraw = useCallback(async (instructions: Record<string, string>) => {
@@ -983,16 +1225,20 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // CORS 代理列表
+        // CORS 代理列表 - 按优先级排序
         const CORS_PROXIES = [
           'https://cors.bridged.cc/',
-          'https://api.allorigins.win/raw?url='
+          'https://api.allorigins.win/raw?url=',
+          'https://proxy.cors.sh/?url='
         ];
         
         const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
           if (proxyIndex >= CORS_PROXIES.length) return url;
           const proxy = CORS_PROXIES[proxyIndex];
           if (proxy.includes('allorigins')) {
+            return `${proxy}${encodeURIComponent(url)}`;
+          }
+          if (proxy.includes('cors.sh')) {
             return `${proxy}${encodeURIComponent(url)}`;
           }
           return `${proxy}${url}`;
@@ -1005,38 +1251,56 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
               img.crossOrigin = "anonymous";
             }
             
+            const baseTimeout = 20000; // 20 秒基础超时
             const timeout = setTimeout(() => {
+              console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
+                console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
                 loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
               } else {
+                console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
                 resolve(false);
               }
-            }, 15000);
+            }, baseTimeout);
             
             img.onload = () => {
               clearTimeout(timeout);
               try {
                 if (img.width > 0 && img.height > 0) {
                   ctx.drawImage(img, x, y, w, h);
+                  const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
+                  console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                   resolve(true);
                 } else {
+                  console.warn('Image loaded but has zero dimensions');
                   resolve(false);
                 }
               } catch (e) {
+                console.error('Failed to draw image on canvas:', e);
                 resolve(false);
               }
             };
             
             img.onerror = () => {
               clearTimeout(timeout);
+              console.warn(`Image load failed (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
+                console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
                 loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
               } else {
+                console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
                 resolve(false);
               }
             };
             
-            const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+            let loadUrl: string;
+            if (proxyIndex === 0) {
+              loadUrl = url;
+            } else {
+              loadUrl = getCorsProxyUrl(url, proxyIndex - 1);
+            }
+            
+            console.log(`Loading image (attempt ${proxyIndex + 1}): ${loadUrl.substring(0, 80)}...`);
             img.src = loadUrl;
           });
         };
@@ -1207,16 +1471,20 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // CORS 代理列表
+        // CORS 代理列表 - 按优先级排序
         const CORS_PROXIES = [
           'https://cors.bridged.cc/',
-          'https://api.allorigins.win/raw?url='
+          'https://api.allorigins.win/raw?url=',
+          'https://proxy.cors.sh/?url='
         ];
         
         const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
           if (proxyIndex >= CORS_PROXIES.length) return url;
           const proxy = CORS_PROXIES[proxyIndex];
           if (proxy.includes('allorigins')) {
+            return `${proxy}${encodeURIComponent(url)}`;
+          }
+          if (proxy.includes('cors.sh')) {
             return `${proxy}${encodeURIComponent(url)}`;
           }
           return `${proxy}${url}`;
@@ -1229,38 +1497,56 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
               img.crossOrigin = "anonymous";
             }
             
+            const baseTimeout = 20000; // 20 秒基础超时
             const timeout = setTimeout(() => {
+              console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
+                console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
                 loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
               } else {
+                console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
                 resolve(false);
               }
-            }, 15000);
+            }, baseTimeout);
             
             img.onload = () => {
               clearTimeout(timeout);
               try {
                 if (img.width > 0 && img.height > 0) {
                   ctx.drawImage(img, x, y, w, h);
+                  const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
+                  console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                   resolve(true);
                 } else {
+                  console.warn('Image loaded but has zero dimensions');
                   resolve(false);
                 }
               } catch (e) {
+                console.error('Failed to draw image on canvas:', e);
                 resolve(false);
               }
             };
             
             img.onerror = () => {
               clearTimeout(timeout);
+              console.warn(`Image load failed (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
+                console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
                 loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
               } else {
+                console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
                 resolve(false);
               }
             };
             
-            const loadUrl = proxyIndex > 0 ? getCorsProxyUrl(url, proxyIndex) : url;
+            let loadUrl: string;
+            if (proxyIndex === 0) {
+              loadUrl = url;
+            } else {
+              loadUrl = getCorsProxyUrl(url, proxyIndex - 1);
+            }
+            
+            console.log(`Loading image (attempt ${proxyIndex + 1}): ${loadUrl.substring(0, 80)}...`);
             img.src = loadUrl;
           });
         };
@@ -1280,9 +1566,8 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         compositeImageUrl = canvas.toDataURL('image/jpeg', 0.9);
       }
 
-      // ✅ BUG FIX: 使用优化后的提示词格式（包含所有分镜信息）
-      const optimizedPrompts = getOptimizedPrompts();
-      const finalPrompt = lang === 'zh' ? optimizedPrompts.zh : optimizedPrompts.en;
+      // ✅ 使用用户修改的提示词（用户编辑的提示词优先级最高）
+      const finalPrompt = newPrompt;
 
       // Create new video with edited prompt and composite image
       const result = await videoServiceRef.current.createVideo(finalPrompt, {
@@ -1672,6 +1957,22 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           }}
           lang={lang}
           isLoading={isLoading}
+        />
+      )}
+
+      {/* Quick Storyboard Config Dialog */}
+      {showQuickStoryboardConfig && quickStoryboardActionType && (
+        <QuickStoryboardConfigDialog
+          isOpen={showQuickStoryboardConfig}
+          actionType={quickStoryboardActionType}
+          lang={lang}
+          theme={theme}
+          onConfirm={handleQuickStoryboardConfirm}
+          onCancel={() => {
+            setShowQuickStoryboardConfig(false);
+            setQuickStoryboardItemId(null);
+            setQuickStoryboardActionType(null);
+          }}
         />
       )}
 

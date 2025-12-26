@@ -119,6 +119,12 @@ export interface VideoServiceConfig {
   apiKey: string;
 }
 
+export type VideoAPIProvider = 'openai' | 'dyu';
+
+export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
+  provider?: VideoAPIProvider;
+}
+
 export interface VideoStatus {
   task_id: string;
   status: 'NOT_START' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
@@ -149,6 +155,9 @@ export interface CreateVideoOptions {
   private?: boolean;
   character_url?: string;
   character_timestamps?: string;
+  // DYU API 特定参数
+  style?: string;
+  storyboard?: boolean;
 }
 
 export interface TokenQuota {
@@ -204,7 +213,15 @@ export const SYMBOL_DESCRIPTIONS: Record<Language, Record<string, string>> = {
     'zoom-in': '镜头推近 (Zoom In)',
     'zoom-out': '镜头拉远 (Zoom Out)',
     'hitchcock': '希区柯克变焦 (Dolly Zoom)',
-    'pov-shot': '主观视角运镜 (POV Shot)'
+    'pov-shot': '主观视角运镜 (POV Shot)',
+    'action-forward': '前进动作 (Forward Motion)',
+    'action-rotate': '旋转动作 (Rotation)',
+    'action-jump': '跳跃动作 (Jump Motion)',
+    'action-fly': '飞行动作 (Flying Motion)',
+    'quick-three-view': '三视图生成 (Three-View)',
+    'quick-multi-grid': '多格布局生成 (Multi-Grid)',
+    'quick-style-comparison': '风格对比生成 (Style Comparison)',
+    'quick-narrative-progression': '叙事进展生成 (Narrative Progression)'
   },
   en: {
     'pan-left': 'Pan Left',
@@ -214,7 +231,15 @@ export const SYMBOL_DESCRIPTIONS: Record<Language, Record<string, string>> = {
     'zoom-in': 'Zoom In',
     'zoom-out': 'Zoom Out',
     'hitchcock': 'Dolly Zoom',
-    'pov-shot': 'POV Shot'
+    'pov-shot': 'POV Shot',
+    'action-forward': 'Forward Motion',
+    'action-rotate': 'Rotation',
+    'action-jump': 'Jump Motion',
+    'action-fly': 'Flying Motion',
+    'quick-three-view': 'Three-View',
+    'quick-multi-grid': 'Multi-Grid',
+    'quick-style-comparison': 'Style Comparison',
+    'quick-narrative-progression': 'Narrative Progression'
   }
 };
 
@@ -226,7 +251,15 @@ export const SYMBOL_LABELS: Record<string, string> = {
   'zoom-in': '⊕',
   'zoom-out': '⊖',
   'hitchcock': '🌀',
-  'pov-shot': '👁️'
+  'pov-shot': '👁️',
+  'action-forward': '➡️',
+  'action-rotate': '🔄',
+  'action-jump': '⬆️',
+  'action-fly': '✈️',
+  'quick-three-view': '📐',
+  'quick-multi-grid': '🎬',
+  'quick-style-comparison': '🎨',
+  'quick-narrative-progression': '📖'
 };
 
 export const I18N = {
