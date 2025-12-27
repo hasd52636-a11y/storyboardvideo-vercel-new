@@ -81,7 +81,7 @@ export const VideoAnalysisPanel: React.FC<VideoAnalysisPanelProps> = ({
             type="file"
             accept="video/*"
             onChange={handleVideoUpload}
-            className="w-full p-2 border rounded-lg"
+            className="hidden"
             disabled={loading}
           />
         </div>

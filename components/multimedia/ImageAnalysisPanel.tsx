@@ -85,7 +85,7 @@ export const ImageAnalysisPanel: React.FC<ImageAnalysisPanelProps> = ({
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            className="w-full p-2 border rounded-lg"
+            className="hidden"
             disabled={loading}
           />
         </div>

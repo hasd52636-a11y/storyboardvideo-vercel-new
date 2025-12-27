@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-chrome@latest"],
+      "env": {
+        "CHROME_DEVTOOLS_LOG_LEVEL": "INFO",
+        "CHROME_DEVTOOLS_HEADLESS": "false"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "mcp_chrome_devtools_navigate_page",
+        "mcp_chrome_devtools_take_screenshot",
+        "mcp_chrome_devtools_take_snapshot",
+        "mcp_chrome_devtools_click",
+        "mcp_chrome_devtools_fill",
+        "mcp_chrome_devtools_press_key",
+        "mcp_chrome_devtools_scroll",
+        "mcp_chrome_devtools_get_page_content"
+      ]
+    }
+  }
+}

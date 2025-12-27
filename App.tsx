@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { StoryboardItem, FilterMode, ToolType, Language, I18N, ModelProvider, Theme, StoryboardSymbol, ExportLayout, SYMBOL_DESCRIPTIONS, SYMBOL_LABELS, StyleOption, AspectRatio, VideoItem } from './types';
 import { generateSceneImage, parseScriptToScenes, generateStoryboardFromDialogue } from './geminiService';
@@ -103,7 +103,7 @@ const App: React.FC = () => {
       }
     };
     
-    // 检测系统语言
+    // ??????
     const systemLang = navigator.language.startsWith('zh') ? 'zh' : 'en';
     const savedLang = localStorage.getItem('director_canvas_lang') as Language | null;
     if (savedLang) {
@@ -112,7 +112,7 @@ const App: React.FC = () => {
       setLang(systemLang);
     }
     
-    // 检测系统主题
+    // ??????
     const savedTheme = localStorage.getItem('director_canvas_theme') as Theme | null;
     if (savedTheme) {
       setTheme(savedTheme);
@@ -124,7 +124,7 @@ const App: React.FC = () => {
     checkKey();
   }, []);
 
-  // 加载帮助内容
+  // ??????
   useEffect(() => {
     const loadHelpContent = async () => {
       try {
@@ -144,7 +144,7 @@ const App: React.FC = () => {
   // Keyboard Shortcuts (Ctrl+A, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 检查是否在输入框或文本区域中
+      // ??????????????
       const isInInput = document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT';
       
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !isInInput) {
@@ -180,7 +180,7 @@ const App: React.FC = () => {
       const startOrder = items.length;
       const isBlackAndWhite = globalColorMode === 'blackAndWhite';
       
-      // 导入工具函数
+      // ??????
       const { calculateHeight } = await import('./types');
       const baseWidth = 380;
       const height = calculateHeight(baseWidth, aspectRatio || '16:9');
@@ -189,14 +189,14 @@ const App: React.FC = () => {
         const scene = scenes[i];
         const sceneNum = `SC-${String(i + 1).padStart(2, '0')}`;
         
-        // 构建完整的提示词格式 - 简洁结构化格式（不包含全局参数和约束条件，已在开始指令中）
-        let enrichedPrompt = `【${sceneNum}】
-[画面描述]: ${scene.description}
-[摄像机语言]: ${scene.visualPrompt}`;
+        // ?????????? - ???????(????????????,???????)
+        let enrichedPrompt = `?${sceneNum}?
+[????]: ${scene.description}
+[?????]: ${scene.visualPrompt}`;
         
-        // ✅ BUG #1 FIX: 添加时长信息到提示词
+        // ? BUG #1 FIX: ??????????
         if (duration && duration > 0) {
-          enrichedPrompt += `\n[时长]: ${duration}秒`;
+          enrichedPrompt += `\n[??]: ${duration}?`;
         }
         
         const imageUrl = await generateSceneImage(enrichedPrompt, true, isBlackAndWhite, style, aspectRatio);
@@ -236,11 +236,11 @@ const App: React.FC = () => {
       const startOrder = items.length;
       const isBlackAndWhite = globalColorMode === 'blackAndWhite';
       
-      // 获取风格对象
+      // ??????
       const { STYLES } = await import('./types');
       const style = STYLES.find(s => s.id === styleId);
       
-      // 导入工具函数
+      // ??????
       const { calculateHeight } = await import('./types');
       const baseWidth = 380;
       const height = calculateHeight(baseWidth, aspectRatio || '16:9');
@@ -249,14 +249,14 @@ const App: React.FC = () => {
         const scene = scenes[i];
         const sceneNum = `SC-${String(i + 1).padStart(2, '0')}`;
         
-        // 构建完整的提示词格式（不包含全局参数，已在开始指令中）
-        let enrichedPrompt = `【${sceneNum}】
-[画面描述]: ${scene.description}
-[摄像机语言]: ${scene.visualPrompt}`;
+        // ??????????(???????,???????)
+        let enrichedPrompt = `?${sceneNum}?
+[????]: ${scene.description}
+[?????]: ${scene.visualPrompt}`;
         
-        // ✅ BUG #3 FIX: 添加时长信息到提示词
+        // ? BUG #3 FIX: ??????????
         if (duration && duration > 0) {
-          enrichedPrompt += `\n[时长]: ${duration}秒`;
+          enrichedPrompt += `\n[??]: ${duration}?`;
         }
         
         const imageUrl = await generateSceneImage(enrichedPrompt, true, isBlackAndWhite, style, aspectRatio);
@@ -299,7 +299,7 @@ const App: React.FC = () => {
       const target = items.find(it => it.id === id);
       if (!target) return;
       setIsLoading(true);
-      // 如果传入了自定义提示词，使用它；否则使用原始提示词加符号
+      // ???????????,???;????????????
       const promptToUse = typeof data === 'string' ? data : target.prompt;
       const symbolInstructions = target.symbols.map(s => SYMBOL_DESCRIPTIONS[lang][s.name]).join(', ');
       const enrichedPrompt = symbolInstructions ? `${promptToUse}. Key actions: ${symbolInstructions}` : promptToUse;
@@ -337,53 +337,53 @@ const App: React.FC = () => {
     return content;
   }, [selectedIds, items, t, lang]);
 
-  // 生成优化后的三段式提示词格式（中英文分开）
+  // ??????????????(?????)
   const getOptimizedPrompts = useCallback(() => {
     if (selectedIds.size === 0) return { zh: "", en: "" };
     const selectedItems = items.filter(it => selectedIds.has(it.id)).sort((a,b) => a.order - b.order);
     
-    // ✅ BUG #5 FIX: 从选中的分镜中获取风格和画幅信息，而不是依赖全局状态
-    // 获取第一个选中分镜的风格和画幅
+    // ? BUG #5 FIX: ????????????????,?????????
+    // ???????????????
     const firstItem = selectedItems[0];
     const itemStyle = firstItem?.aspectRatio ? currentStyle : null;
     const itemAspectRatio = firstItem?.aspectRatio || '16:9';
     
-    // 获取风格和画幅信息
-    const styleInfo = currentStyle?.nameZh || currentStyle?.name || '写实摄影';
+    // ?????????
+    const styleInfo = currentStyle?.nameZh || currentStyle?.name || '????';
     const styleInfoEn = currentStyle?.name || 'Realistic Photography';
     const aspectRatioInfo = itemAspectRatio || '16:9';
     
-    // 生成中文版本
+    // ??????
     const zhContent = (() => {
-      let globalInstr = `【全局指令】必须按照以下规则生成视频：
-1、禁止将参考图写入画面，按照参考图标注的序号生成视频
-2、保持${styleInfo}风格
-3、${aspectRatioInfo}画幅
-【限制性指令】禁止闪烁，严禁背景形变，保持角色一致性。
-单一连续电影镜头，沉浸式360度环境，无分屏，无边框，无分镜布局，无UI
-【约束条件】不修改参考主体特征 | 保持视觉连续性 | 严格按编号顺序`;
+      let globalInstr = `??????????????????:
+1???????????,??????????????
+2???${styleInfo}??
+3?${aspectRatioInfo}??
+???????????,??????,????????
+????????,???360???,???,???,?????,?UI
+??????????????? | ??????? | ???????`;
       let content = `${globalInstr}\n\n`;
       
       content += selectedItems.map(it => {
-        // 使用分镜的 order 属性生成编号，保持和画布上的编号一致
+        // ????? order ??????,???????????
         const sceneNum = `SC-${String(it.order + 1).padStart(2, '0')}`;
         
-        // 从 prompt 中提取实际内容（去掉开头的【SC-XX】部分）
+        // ? prompt ???????(??????SC-XX???)
         let promptContent = it.prompt;
-        const sceneNumPattern = new RegExp('^【SC-\\d{2}】\\n');
+        const sceneNumPattern = new RegExp('^?SC-\\d{2}?\\n');
         if (sceneNumPattern.test(promptContent)) {
           promptContent = promptContent.replace(sceneNumPattern, '');
         }
         
-        let sceneContent = `【${sceneNum}】\n${promptContent}`;
+        let sceneContent = `?${sceneNum}?\n${promptContent}`;
         
-        // 添加符号信息
+        // ??????
         if (it.symbols && it.symbols.length > 0) {
           const symbolDescriptions = it.symbols
             .map(s => SYMBOL_DESCRIPTIONS['zh'][s.name] || s.name)
             .filter(Boolean);
           if (symbolDescriptions.length > 0) {
-            sceneContent += `\n【动作与运动】${symbolDescriptions.join('，')}`;
+            sceneContent += `\n???????${symbolDescriptions.join(',')}`;
           }
         }
         
@@ -393,7 +393,7 @@ const App: React.FC = () => {
       return content;
     })();
     
-    // 生成英文版本
+    // ??????
     const enContent = (() => {
       let globalInstr = `[GLOBAL] Must generate video according to the following rules:
 1. Do not write reference image into the frame, generate video according to the sequence marked in the reference image
@@ -405,19 +405,19 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       let content = `${globalInstr}\n\n`;
       
       content += selectedItems.map(it => {
-        // 使用分镜的 order 属性生成编号，保持和画布上的编号一致
+        // ????? order ??????,???????????
         const sceneNum = `SC-${String(it.order + 1).padStart(2, '0')}`;
         
-        // 从 prompt 中提取实际内容（去掉开头的【SC-XX】部分）
+        // ? prompt ???????(??????SC-XX???)
         let promptContent = it.prompt;
-        const sceneNumPattern = new RegExp('^【SC-\\d{2}】\\n');
+        const sceneNumPattern = new RegExp('^?SC-\\d{2}?\\n');
         if (sceneNumPattern.test(promptContent)) {
           promptContent = promptContent.replace(sceneNumPattern, '');
         }
         
-        let sceneContent = `【${sceneNum}】\n${promptContent}`;
+        let sceneContent = `?${sceneNum}?\n${promptContent}`;
         
-        // 添加符号信息
+        // ??????
         if (it.symbols && it.symbols.length > 0) {
           const symbolDescriptions = it.symbols
             .map(s => SYMBOL_DESCRIPTIONS['en'][s.name] || s.name)
@@ -456,21 +456,21 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       const refItem = items.find(it => it.isMain && selectedIds.has(it.id));
       const frameItems = items.filter(it => !it.isMain && selectedIds.has(it.id));
       
-      // 检查是否有分镜图要导出
+      // ???????????
       if (frameItems.length === 0) {
         setIsLoading(false);
         return alert(lang === 'zh' 
-          ? '请选择至少一个分镜图进行导出' 
+          ? '??????????????' 
           : 'Please select at least one storyboard frame to export');
       }
       
-      // ✅ 新增：验证所有分镜的比例相同
+      // ? ??:???????????
       const { parseAspectRatio } = await import('./types');
       const ratios = new Set(frameItems.map(it => it.aspectRatio || '16:9'));
       if (ratios.size > 1) {
         setIsLoading(false);
         return alert(lang === 'zh' 
-          ? '导出的分镜必须是同一个比例' 
+          ? '?????????????' 
           : 'All exported frames must have the same aspect ratio');
       }
       
@@ -503,7 +503,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       const frameCount = frameItems.length;
       const hasRef = !!refItem;
       
-      // ✅ 新增：获取统一的比例
+      // ? ??:???????
       const frameRatio = frameItems[0]?.aspectRatio || '16:9';
       const ratio = parseAspectRatio(frameRatio);
       
@@ -517,9 +517,9 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         refW = 300;
         refH = 400;
         frameW = 300;
-        frameH = frameW / ratio;  // ✅ 改动：动态计算
+        frameH = frameW / ratio;  // ? ??:????
         
-        // 有参考主体时，分镜最多2列
+        // ??????,????2?
         cols = Math.min(2, frameCount);
         rows = Math.ceil(frameCount / cols);
         
@@ -536,9 +536,9 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       } else {
         // Layout without reference: full grid
         frameW = 400;
-        frameH = frameW / ratio;  // ✅ 改动：动态计算
+        frameH = frameW / ratio;  // ? ??:????
         
-        // 无参考主体时，根据数量智能调整列数
+        // ??????,??????????
         if (frameCount <= 2) {
           cols = frameCount;
         } else if (frameCount <= 4) {
@@ -560,14 +560,14 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // CORS 代理列表 - 按优先级排序
+      // CORS ???? - ??????
       const CORS_PROXIES = [
         'https://cors.bridged.cc/',
         'https://api.allorigins.win/raw?url=',
         'https://proxy.cors.sh/?url='
       ];
       
-      // 获取 CORS 代理 URL
+      // ?? CORS ?? URL
       const getCorsProxyUrl = (url: string, proxyIndex: number): string => {
         if (proxyIndex >= CORS_PROXIES.length) return url;
         const proxy = CORS_PROXIES[proxyIndex];
@@ -580,21 +580,21 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         return `${proxy}${url}`;
       };
       
-      // 直接加载图片并绘制到导出 Canvas（支持 CORS 代理）
+      // ???????????? Canvas(?? CORS ??)
       const loadAndDrawImage = async (url: string, x: number, y: number, w: number, h: number, proxyIndex: number = 0): Promise<boolean> => {
         return new Promise((resolve) => {
           const img = new Image();
           
-          // 处理 CORS 问题：尝试多种方式加载图片
+          // ?? CORS ??:??????????
           if (!url.startsWith('data:')) {
             img.crossOrigin = "anonymous";
           }
           
-          // 根据尝试次数调整超时时间
-          const baseTimeout = 20000; // 20 秒基础超时
+          // ????????????
+          const baseTimeout = 20000; // 20 ?????
           const timeout = setTimeout(() => {
             console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
-            // 尝试下一个代理
+            // ???????
             if (proxyIndex < CORS_PROXIES.length) {
               console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
               loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
@@ -610,7 +610,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
               if (img.width > 0 && img.height > 0) {
                 ctx.drawImage(img, x, y, w, h);
                 const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
-                console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
+                console.log(`? Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                 resolve(true);
               } else {
                 console.warn('Image loaded but has zero dimensions');
@@ -626,18 +626,18 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             clearTimeout(timeout);
             console.warn(`Image load failed (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
             
-            // 尝试下一个代理
+            // ???????
             if (proxyIndex < CORS_PROXIES.length) {
               console.log(`Retrying with CORS proxy ${proxyIndex + 1}/${CORS_PROXIES.length}...`);
               loadAndDrawImage(url, x, y, w, h, proxyIndex + 1).then(resolve);
             } else {
-              // 所有代理都失败了，返回 false
+              // ????????,?? false
               console.warn(`All ${CORS_PROXIES.length + 1} attempts failed for: ${url.substring(0, 50)}`);
               resolve(false);
             }
           };
           
-          // 使用代理 URL 或原始 URL
+          // ???? URL ??? URL
           let loadUrl: string;
           if (proxyIndex === 0) {
             loadUrl = url;
@@ -650,7 +650,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         });
       };
 
-      // 改进的图片加载函数，带超时控制
+      // ?????????,?????
       const loadImage = (url: string, timeout: number = 20000): Promise<HTMLImageElement> => {
         return new Promise((resolve, reject) => {
           const img = new Image();
@@ -699,10 +699,10 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             // Chinese label
             ctx.fillStyle = '#ff0000';
             ctx.font = 'bold 12px Arial';
-            const refLabel = lang === 'zh' ? '参考主体' : 'Reference';
+            const refLabel = lang === 'zh' ? '????' : 'Reference';
             ctx.fillText(refLabel, refX + 90, refY + 2);
           } else {
-            // 绘制占位符
+            // ?????
             ctx.fillStyle = '#cccccc';
             ctx.fillRect(refX, refY, refW, refH);
             ctx.fillStyle = '#666666';
@@ -711,7 +711,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           }
         } catch (e) { 
           console.error("Reference image load fail", e);
-          // 绘制占位符
+          // ?????
           ctx.fillStyle = '#cccccc';
           ctx.fillRect(refX, refY, refW, refH);
           ctx.fillStyle = '#666666';
@@ -747,46 +747,46 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
             ctx.fillStyle = '#ffffff';
             ctx.font = '700 14px Inter';
             ctx.fillText(`SC-${String(frameNum).padStart(2, '0')}`, x + 18, y + 30);
-            console.log(`✓ Frame ${i + 1} loaded successfully`);
+            console.log(`? Frame ${i + 1} loaded successfully`);
           } else {
-            // 绘制占位符 - 浅灰色背景
+            // ????? - ?????
             ctx.fillStyle = '#f0f0f0';
             ctx.fillRect(x, y, frameW, frameH);
             ctx.strokeStyle = '#0000ff';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, frameW, frameH);
             
-            // 显示错误信息
+            // ??????
             ctx.fillStyle = '#999999';
             ctx.font = 'bold 14px Arial';
             ctx.fillText('Image Failed', x + 10, y + frameH / 2 - 10);
             ctx.font = '12px Arial';
             ctx.fillText('to Load', x + 10, y + frameH / 2 + 10);
             
-            // 仍然显示场景编号
+            // ????????
             ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.fillRect(x + 10, y + 10, 60, 28);
             ctx.fillStyle = '#ffffff';
             ctx.font = '700 14px Inter';
             ctx.fillText(`SC-${String(frameNum).padStart(2, '0')}`, x + 18, y + 30);
             
-            console.warn(`⚠ Frame ${i + 1} image failed to load, showing placeholder`);
+            console.warn(`? Frame ${i + 1} image failed to load, showing placeholder`);
           }
         } catch (e) { 
-          console.error(`✗ Frame ${i + 1} load fail:`, e);
-          // 绘制占位符
+          console.error(`? Frame ${i + 1} load fail:`, e);
+          // ?????
           ctx.fillStyle = '#f0f0f0';
           ctx.fillRect(x, y, frameW, frameH);
           ctx.strokeStyle = '#0000ff';
           ctx.lineWidth = 2;
           ctx.strokeRect(x, y, frameW, frameH);
           
-          // 显示错误信息
+          // ??????
           ctx.fillStyle = '#999999';
           ctx.font = 'bold 14px Arial';
           ctx.fillText('Error', x + 10, y + frameH / 2 - 10);
           
-          // 仍然显示场景编号
+          // ????????
           ctx.fillStyle = 'rgba(0,0,0,0.7)';
           ctx.fillRect(x + 10, y + 10, 60, 28);
           ctx.fillStyle = '#ffffff';
@@ -795,12 +795,12 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         }
       }
 
-      // 使用 canvas.toBlob 而不是 toDataURL，更高效
-      // 处理 Tainted Canvas 问题：使用 try-catch 和降级方案
+      // ?? canvas.toBlob ??? toDataURL,???
+      // ?? Tainted Canvas ??:?? try-catch ?????
       try {
         canvas.toBlob((blob) => {
           if (!blob) {
-            alert(lang === 'zh' ? '导出失败，请重试' : 'Export failed, please try again');
+            alert(lang === 'zh' ? '????,???' : 'Export failed, please try again');
             setIsLoading(false);
             return;
           }
@@ -816,7 +816,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           setIsLoading(false);
         }, 'image/jpeg', 0.9);
       } catch (blobError) {
-        // 如果 toBlob 失败（Tainted Canvas），尝试使用 toDataURL 降级方案
+        // ?? toBlob ??(Tainted Canvas),???? toDataURL ????
         console.warn('toBlob failed, trying toDataURL fallback:', blobError);
         try {
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -830,14 +830,14 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         } catch (dataUrlError) {
           console.error('Both toBlob and toDataURL failed:', dataUrlError);
           alert(lang === 'zh' 
-            ? '导出失败：Canvas 被污染，请确保所有图片都能正常加载' 
+            ? '????:Canvas ???,?????????????' 
             : 'Export failed: Canvas is tainted. Please ensure all images load correctly');
           setIsLoading(false);
         }
       }
     } catch (e) {
       console.error("Export failed", e);
-      alert(lang === 'zh' ? '导出失败：' + String(e) : 'Export failed: ' + String(e));
+      alert(lang === 'zh' ? '????:' + String(e) : 'Export failed: ' + String(e));
       setIsLoading(false);
     }
   };
@@ -948,7 +948,7 @@ Create a single frame showing the subject rendered in ${style} artistic style. M
         }
       } catch (error) {
         console.error('Quick storyboard action failed:', error);
-        alert(lang === 'zh' ? '快捷分镜生成失败' : 'Quick storyboard generation failed');
+        alert(lang === 'zh' ? '????????' : 'Quick storyboard generation failed');
       } finally {
         setIsLoading(false);
       }
@@ -1057,7 +1057,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       }
     } catch (error) {
       console.error('Quick storyboard action failed:', error);
-      alert(lang === 'zh' ? '快捷分镜生成失败' : 'Quick storyboard generation failed');
+      alert(lang === 'zh' ? '????????' : 'Quick storyboard generation failed');
     } finally {
       setIsLoading(false);
       setQuickStoryboardItemId(null);
@@ -1068,10 +1068,10 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
   const handleBatchRedraw = useCallback(async (instructions: Record<string, string>) => {
     if (Object.keys(instructions).length === 0) return;
     
-    // 获取所有选中的分镜（按标注顺序）
+    // ?????????(?????)
     const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
     
-    // 按标注顺序排序
+    // ???????
     const orderedFrames = selectionOrder.length > 0 
       ? selectionOrder.map(id => selectedFrames.find(f => f.id === id)).filter(Boolean) as StoryboardItem[]
       : selectedFrames.sort((a, b) => {
@@ -1079,11 +1079,11 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           return a.x - b.x;
         });
     
-    // 限制最多 6 张
+    // ???? 6 ?
     const MAX_BATCH_SIZE = 6;
     if (orderedFrames.length > MAX_BATCH_SIZE) {
       alert(lang === 'zh' 
-        ? `批量重绘最多支持 ${MAX_BATCH_SIZE} 张分镜，当前选中 ${orderedFrames.length} 张。请减少选择数量。` 
+        ? `???????? ${MAX_BATCH_SIZE} ???,???? ${orderedFrames.length} ??????????` 
         : `Batch redraw supports maximum ${MAX_BATCH_SIZE} frames, but ${orderedFrames.length} are selected. Please reduce the selection.`);
       return;
     }
@@ -1093,13 +1093,13 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
     let failureCount = 0;
     
     try {
-      // 顺序处理队列（一次一张，避免 API 限流）
+      // ??????(????,?? API ??)
       for (let i = 0; i < orderedFrames.length; i++) {
         const frame = orderedFrames[i];
         const sceneNum = `SC-${String(i + 1).padStart(2, '0')}`;
         const instruction = instructions[sceneNum] || '';
         
-        // 组合提示词：原始提示词 + 用户指令 + 符号信息
+        // ?????:????? + ???? + ????
         const symbolInstructions = frame.symbols
           .map(s => SYMBOL_DESCRIPTIONS[lang][s.name] || s.name)
           .filter(Boolean)
@@ -1113,47 +1113,47 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           finalPrompt = `${finalPrompt}. Key actions: ${symbolInstructions}`;
         }
         
-        // 生成新图片
+        // ?????
         const isBlackAndWhite = frame.colorMode === 'blackAndWhite';
         try {
-          console.log(`[${sceneNum}] 开始生成... (${i + 1}/${orderedFrames.length})`);
+          console.log(`[${sceneNum}] ????... (${i + 1}/${orderedFrames.length})`);
           const newUrl = await generateSceneImage(finalPrompt, true, isBlackAndWhite, undefined, frame.aspectRatio);
           if (newUrl) {
             setItems(prev => prev.map(it => it.id === frame.id ? { ...it, imageUrl: newUrl, filter: FilterMode.LINE_ART, prompt: finalPrompt } : it));
             successCount++;
-            console.log(`[${sceneNum}] ✓ 生成成功`);
+            console.log(`[${sceneNum}] ? ????`);
           } else {
             failureCount++;
-            console.warn(`[${sceneNum}] ✗ 生成失败：返回空 URL`);
+            console.warn(`[${sceneNum}] ? ????:??? URL`);
           }
         } catch (frameError) {
           failureCount++;
-          console.error(`[${sceneNum}] ✗ 生成错误:`, frameError);
+          console.error(`[${sceneNum}] ? ????:`, frameError);
         }
         
-        // 每张之间添加 500ms 延迟，进一步避免 API 限流
+        // ?????? 500ms ??,????? API ??
         if (i < orderedFrames.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
-      // 显示结果提示
+      // ??????
       if (failureCount > 0) {
         alert(lang === 'zh' 
-          ? `批量重绘完成：成功 ${successCount} 张，失败 ${failureCount} 张` 
+          ? `??????:?? ${successCount} ?,?? ${failureCount} ?` 
           : `Batch redraw completed: ${successCount} succeeded, ${failureCount} failed`);
       } else if (successCount > 0) {
         alert(lang === 'zh' 
-          ? `批量重绘完成：成功 ${successCount} 张` 
+          ? `??????:?? ${successCount} ?` 
           : `Batch redraw completed: ${successCount} succeeded`);
       }
       
-      // 关闭批量重绘对话框
+      // ?????????
       setShowBatchRedrawDialog(false);
     } catch (e) {
       console.error("Batch redraw failed", e);
       alert(lang === 'zh' 
-        ? `批量重绘失败：${String(e)}` 
+        ? `??????:${String(e)}` 
         : `Batch redraw failed: ${String(e)}`);
     } finally {
       setIsLoading(false);
@@ -1165,7 +1165,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       // Initialize VideoService with config from localStorage
       const configStr = localStorage.getItem('director_canvas_video_config');
       if (!configStr) {
-        alert(lang === 'zh' ? '请先配置视频 API' : 'Please configure video API first');
+        alert(lang === 'zh' ? '?????? API' : 'Please configure video API first');
         return;
       }
       const config = JSON.parse(configStr);
@@ -1175,18 +1175,18 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
     try {
       setIsLoading(true);
       
-      // ✅ BUG FIX: 使用优化后的提示词格式（包含所有分镜信息）
+      // ? BUG FIX: ???????????(????????)
       const optimizedPrompts = getOptimizedPrompts();
       const finalPrompt = lang === 'zh' ? optimizedPrompts.zh : optimizedPrompts.en;
       
       // Get selected storyboard images
       const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
       
-      // ✅ BUG FIX: API 只支持单张图片，需要把多张分镜合成一张图片
+      // ? BUG FIX: API ???????,?????????????
       let compositeImageUrl: string | undefined;
       
       if (selectedFrames.length > 0) {
-        // 合成多张分镜图为一张
+        // ??????????
         const { parseAspectRatio } = await import('./types');
         const frameRatio = selectedFrames[0]?.aspectRatio || '16:9';
         const ratio = parseAspectRatio(frameRatio);
@@ -1194,12 +1194,12 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          alert(lang === 'zh' ? '无法创建合成图' : 'Failed to create composite image');
+          alert(lang === 'zh' ? '???????' : 'Failed to create composite image');
           setIsLoading(false);
           return;
         }
 
-        // 计算布局
+        // ????
         const frameCount = selectedFrames.length;
         let cols: number, rows: number, frameW: number, frameH: number;
         const padding = 20;
@@ -1207,7 +1207,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         frameW = 400;
         frameH = frameW / ratio;
         
-        // 根据数量智能调整列数
+        // ??????????
         if (frameCount <= 2) {
           cols = frameCount;
         } else if (frameCount <= 4) {
@@ -1225,7 +1225,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // CORS 代理列表 - 按优先级排序
+        // CORS ???? - ??????
         const CORS_PROXIES = [
           'https://cors.bridged.cc/',
           'https://api.allorigins.win/raw?url=',
@@ -1251,7 +1251,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
               img.crossOrigin = "anonymous";
             }
             
-            const baseTimeout = 20000; // 20 秒基础超时
+            const baseTimeout = 20000; // 20 ?????
             const timeout = setTimeout(() => {
               console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
@@ -1269,7 +1269,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
                 if (img.width > 0 && img.height > 0) {
                   ctx.drawImage(img, x, y, w, h);
                   const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
-                  console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
+                  console.log(`? Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                   resolve(true);
                 } else {
                   console.warn('Image loaded but has zero dimensions');
@@ -1305,7 +1305,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           });
         };
 
-        // 绘制所有分镜图
+        // ???????
         for (let i = 0; i < selectedFrames.length; i++) {
           const frame = selectedFrames[i];
           const r = Math.floor(i / cols);
@@ -1316,7 +1316,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           await loadAndDrawImage(frame.imageUrl, x, y, frameW, frameH);
         }
 
-        // 转换为 base64 数据 URL
+        // ??? base64 ?? URL
         compositeImageUrl = canvas.toDataURL('image/jpeg', 0.9);
       }
 
@@ -1355,7 +1355,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
                   ...item,
                   progress: status.progress,
                   status: status.status === 'SUCCESS' ? 'completed' : status.status === 'FAILURE' ? 'failed' : 'loading',
-                  videoUrl: status.video_url || item.videoUrl, // 保留之前的 URL，如果新的为空
+                  videoUrl: status.video_url || item.videoUrl, // ????? URL,??????
                   error: status.error?.message
                 }
               : item
@@ -1380,7 +1380,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       setShowVideoGenDialog(false);
     } catch (error) {
       console.error('Video generation error:', error);
-      alert(lang === 'zh' ? '视频生成失败：' + String(error) : 'Video generation failed: ' + String(error));
+      alert(lang === 'zh' ? '??????:' + String(error) : 'Video generation failed: ' + String(error));
     } finally {
       setIsLoading(false);
     }
@@ -1397,6 +1397,177 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
     setShowVideoGenDialog(true);
   }, [items]);
 
+  // Handle quick storyboard actions from context menu
+  const handleQuickAction = useCallback((itemId: string, actionType: 'three-view' | 'style-comparison' | 'multi-grid' | 'narrative-progression') => {
+    const item = items.find(it => it.id === itemId);
+    if (!item) return;
+
+    console.log(`[App] Quick action triggered: ${actionType} for item ${itemId}`);
+    
+    const generateQuickStoryboard = async () => {
+      setIsLoading(true);
+      try {
+        let newItems: StoryboardItem[] = [];
+        const baseWidth = 380;
+        const { calculateHeight } = await import('./types');
+        const height = calculateHeight(baseWidth, '16:9');
+        
+        if (actionType === 'three-view') {
+          const threeViewPrompts = [
+            `Professional cinematic storyboard frame - Front orthographic view. Show a detailed subject from the front with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+            `Professional cinematic storyboard frame - Side orthographic view. Show a detailed subject from the side with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+            `Professional cinematic storyboard frame - Top orthographic view. Show a detailed subject from above with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`
+          ];
+
+          for (let i = 0; i < 3; i++) {
+            try {
+              const imageUrl = await generateSceneImage(threeViewPrompts[i], true, false, undefined, '16:9');
+              if (imageUrl) {
+                newItems.push({
+                  id: crypto.randomUUID(),
+                  imageUrl,
+                  prompt: threeViewPrompts[i],
+                  description: ['Front View', 'Side View', 'Top View'][i],
+                  x: item.x + (i * 420),
+                  y: item.y,
+                  width: baseWidth,
+                  height,
+                  isMain: false,
+                  filter: FilterMode.LINE_ART,
+                  order: items.length + i,
+                  symbols: [],
+                  colorMode: 'color',
+                  aspectRatio: '16:9'
+                });
+              }
+            } catch (err) {
+              console.error(`Failed to generate view ${i + 1}:`, err);
+            }
+          }
+        } else if (actionType === 'multi-grid') {
+          const frameCount = prompt('Enter number of frames (2-12):', '4');
+          if (!frameCount) {
+            setIsLoading(false);
+            return;
+          }
+          
+          const count = parseInt(frameCount);
+          if (isNaN(count) || count < 2 || count > 12) {
+            alert('Please enter a number between 2 and 12');
+            setIsLoading(false);
+            return;
+          }
+
+          const prompt_text = `Professional cinematic storyboard - ${count}-frame grid showing a narrative sequence. Each frame shows progression of a dramatic scene with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+          
+          try {
+            const imageUrl = await generateSceneImage(prompt_text, true, false, undefined, '16:9');
+            if (imageUrl) {
+              newItems.push({
+                id: crypto.randomUUID(),
+                imageUrl,
+                prompt: prompt_text,
+                description: `Multi-Grid (${count} frames)`,
+                x: item.x,
+                y: item.y + 300,
+                width: baseWidth * 2,
+                height: height * 1.5,
+                isMain: false,
+                filter: FilterMode.LINE_ART,
+                order: items.length,
+                symbols: [],
+                colorMode: 'color',
+                aspectRatio: '16:9'
+              });
+            }
+          } catch (err) {
+            console.error('Failed to generate multi-grid:', err);
+          }
+        } else if (actionType === 'style-comparison') {
+          const styles = ['oil painting', 'watercolor', 'digital art', 'anime', 'photorealistic'];
+          
+          for (let idx = 0; idx < styles.length; idx++) {
+            const style = styles[idx];
+            try {
+              const prompt_text = `Professional cinematic storyboard frame in ${style} artistic style. Show a detailed subject with clear composition, professional lighting, and rich details. High quality artwork. Aspect ratio: 16:9`;
+              const imageUrl = await generateSceneImage(prompt_text, true, false, undefined, '16:9');
+              if (imageUrl) {
+                newItems.push({
+                  id: crypto.randomUUID(),
+                  imageUrl,
+                  prompt: prompt_text,
+                  description: `${style} style`,
+                  x: item.x + (idx * 420),
+                  y: item.y + 300,
+                  width: baseWidth,
+                  height,
+                  isMain: false,
+                  filter: FilterMode.LINE_ART,
+                  order: items.length + idx,
+                  symbols: [],
+                  colorMode: 'color',
+                  aspectRatio: '16:9'
+                });
+              }
+            } catch (err) {
+              console.error(`Failed to generate ${style} style:`, err);
+            }
+          }
+        } else if (actionType === 'narrative-progression') {
+          const frameCount = prompt('Enter number of frames (1-12):', '4');
+          if (!frameCount) {
+            setIsLoading(false);
+            return;
+          }
+          
+          const count = parseInt(frameCount);
+          if (isNaN(count) || count < 1 || count > 12) {
+            alert('Please enter a number between 1 and 12');
+            setIsLoading(false);
+            return;
+          }
+
+          for (let i = 0; i < count; i++) {
+            try {
+              const prompt_text = `Professional cinematic storyboard frame ${i + 1} of ${count}. Show a dramatic scene with clear composition, professional lighting, and rich details. Part of a narrative sequence showing story progression. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+              const imageUrl = await generateSceneImage(prompt_text, true, false, undefined, '16:9');
+              if (imageUrl) {
+                newItems.push({
+                  id: crypto.randomUUID(),
+                  imageUrl,
+                  prompt: prompt_text,
+                  description: `Frame ${i + 1}`,
+                  x: item.x + (i % 3) * 420,
+                  y: item.y + Math.floor(i / 3) * 300,
+                  width: baseWidth,
+                  height,
+                  isMain: false,
+                  filter: FilterMode.LINE_ART,
+                  order: items.length + i,
+                  symbols: [],
+                  colorMode: 'color',
+                  aspectRatio: '16:9'
+                });
+              }
+            } catch (err) {
+              console.error(`Failed to generate frame ${i + 1}:`, err);
+            }
+          }
+        }
+
+        if (newItems.length > 0) {
+          setItems(prev => [...prev, ...newItems]);
+        }
+      } catch (error) {
+        console.error('[App] Quick action error:', error);
+        alert('Failed to generate storyboard. Please check your API configuration.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generateQuickStoryboard();
+  }, [items]);
   const handleDeleteVideoWindow = useCallback((videoId: string) => {
     setVideoItems(prev => prev.filter(item => item.id !== videoId));
   }, []);
@@ -1428,11 +1599,11 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       // Get selected storyboard images
       const selectedFrames = items.filter(it => !it.isMain && selectedIds.has(it.id));
       
-      // ✅ BUG FIX: API 只支持单张图片，需要把多张分镜合成一张图片
+      // ? BUG FIX: API ???????,?????????????
       let compositeImageUrl: string | undefined;
       
       if (selectedFrames.length > 0) {
-        // 合成多张分镜图为一张
+        // ??????????
         const { parseAspectRatio } = await import('./types');
         const frameRatio = selectedFrames[0]?.aspectRatio || '16:9';
         const ratio = parseAspectRatio(frameRatio);
@@ -1440,12 +1611,12 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          alert(lang === 'zh' ? '无法创建合成图' : 'Failed to create composite image');
+          alert(lang === 'zh' ? '???????' : 'Failed to create composite image');
           setIsLoading(false);
           return;
         }
 
-        // 计算布局
+        // ????
         const frameCount = selectedFrames.length;
         let cols: number, rows: number, frameW: number, frameH: number;
         const padding = 20;
@@ -1453,7 +1624,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         frameW = 400;
         frameH = frameW / ratio;
         
-        // 根据数量智能调整列数
+        // ??????????
         if (frameCount <= 2) {
           cols = frameCount;
         } else if (frameCount <= 4) {
@@ -1471,7 +1642,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // CORS 代理列表 - 按优先级排序
+        // CORS ???? - ??????
         const CORS_PROXIES = [
           'https://cors.bridged.cc/',
           'https://api.allorigins.win/raw?url=',
@@ -1497,7 +1668,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
               img.crossOrigin = "anonymous";
             }
             
-            const baseTimeout = 20000; // 20 秒基础超时
+            const baseTimeout = 20000; // 20 ?????
             const timeout = setTimeout(() => {
               console.warn(`Image load timeout (attempt ${proxyIndex + 1}): ${url.substring(0, 50)}`);
               if (proxyIndex < CORS_PROXIES.length) {
@@ -1515,7 +1686,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
                 if (img.width > 0 && img.height > 0) {
                   ctx.drawImage(img, x, y, w, h);
                   const method = proxyIndex === 0 ? 'direct' : `proxy ${proxyIndex}`;
-                  console.log(`✓ Image drawn successfully (${method}): ${url.substring(0, 50)}`);
+                  console.log(`? Image drawn successfully (${method}): ${url.substring(0, 50)}`);
                   resolve(true);
                 } else {
                   console.warn('Image loaded but has zero dimensions');
@@ -1551,7 +1722,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           });
         };
 
-        // 绘制所有分镜图
+        // ???????
         for (let i = 0; i < selectedFrames.length; i++) {
           const frame = selectedFrames[i];
           const r = Math.floor(i / cols);
@@ -1562,11 +1733,11 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
           await loadAndDrawImage(frame.imageUrl, x, y, frameW, frameH);
         }
 
-        // 转换为 base64 数据 URL
+        // ??? base64 ?? URL
         compositeImageUrl = canvas.toDataURL('image/jpeg', 0.9);
       }
 
-      // ✅ 使用用户修改的提示词（用户编辑的提示词优先级最高）
+      // ? ??????????(?????????????)
       const finalPrompt = newPrompt;
 
       // Create new video with edited prompt and composite image
@@ -1629,7 +1800,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       setEditingVideoId(null);
     } catch (error) {
       console.error('Video edit error:', error);
-      alert(lang === 'zh' ? '视频重新生成失败：' + String(error) : 'Video regeneration failed: ' + String(error));
+      alert(lang === 'zh' ? '????????:' + String(error) : 'Video regeneration failed: ' + String(error));
     } finally {
       setIsLoading(false);
     }
@@ -1675,17 +1846,17 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
 
     const type = importTypeRef.current;
     
-    // 参考主体只能上传1张，分镜最多6张
+    // ????????1?,????6?
     const maxFiles = type === 'ref' ? 1 : 6;
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    const MAX_CONCURRENT = 3; // 最多同时处理3个文件
+    const MAX_CONCURRENT = 3; // ??????3???
 
     const filesToProcess = Array.from(files).slice(0, maxFiles);
 
-    // 验证文件大小
+    // ??????
     const validFiles = filesToProcess.filter((file: File) => {
       if (file.size > MAX_FILE_SIZE) {
-        alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
+        alert(`?? "${file.name}" ?? 5MB ??,???`);
         return false;
       }
       return true;
@@ -1693,7 +1864,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
 
     if (validFiles.length === 0) return;
 
-    // 如果是参考主体，先清除现有的参考主体
+    // ???????,??????????
     if (type === 'ref') {
       setItems(prev => prev.filter(it => !it.isMain));
     }
@@ -1702,10 +1873,10 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
     let currentIndex = 0;
     const newItems: StoryboardItem[] = [];
 
-    // 并发控制：一次最多处理3个文件
+    // ????:??????3???
     const processNextFile = () => {
       if (currentIndex >= validFiles.length) {
-        // 所有文件处理完成
+        // ????????
         if (processedCount === validFiles.length) {
           setItems(prev => {
             if (type === 'ref') {
@@ -1745,12 +1916,12 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
         newItems.push(newItem);
         processedCount++;
 
-        // 处理下一个文件
+        // ???????
         processNextFile();
       };
 
       reader.onerror = () => {
-        console.error(`文件读取失败`);
+        console.error(`??????`);
         processedCount++;
         processNextFile();
       };
@@ -1758,7 +1929,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
       reader.readAsDataURL(file);
     };
 
-    // 启动并发处理（最多3个）
+    // ??????(??3?)
     for (let i = 0; i < Math.min(MAX_CONCURRENT, validFiles.length); i++) {
       processNextFile();
     }
@@ -1853,8 +2024,8 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
             <span className="text-white font-black text-3xl">L</span>
           </div>
           <div className="flex flex-col">
-            <span className={`text-lg font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{lang === 'zh' ? '分镜大师' : 'Storyboard Master'}</span>
-            <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">{lang === 'zh' ? 'Storyboard Master' : '分镜大师'}</span>
+            <span className={`text-lg font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{lang === 'zh' ? '????' : 'Storyboard Master'}</span>
+            <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">{lang === 'zh' ? 'Storyboard Master' : '????'}</span>
           </div>
         </div>
         
@@ -1874,6 +2045,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
               onShowBatchRedrawDialog={() => setShowBatchRedrawDialog(true)}
               onExportJPEG={handleExportJPEG}
               onGenerateVideo={() => handleGenerateVideoFromContextMenu(item.id)}
+              onQuickAction={handleQuickAction}
               selectedIds={selectedIds} />
           ))}
           {selectionRect && (
@@ -1995,4 +2167,9 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
 };
 
 export default App;
+
+
+
+
+
 

@@ -15,45 +15,59 @@ interface StoryboardCardProps {
   onExportJPEG?: () => void;
   selectedIds?: Set<string>;
   onGenerateVideo?: () => void;
+  onQuickAction?: (itemId: string, actionType: 'three-view' | 'style-comparison' | 'multi-grid' | 'narrative-progression') => void;
 }
 
-const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected, onSelect, onAction, onDragStart, lang, onDropSymbol, selectedCount, onShowBatchRedrawDialog, onExportJPEG, selectedIds, onGenerateVideo }) => {
+const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected, onSelect, onAction, onDragStart, lang, onDropSymbol, selectedCount, onShowBatchRedrawDialog, onExportJPEG, selectedIds, onGenerateVideo, onQuickAction }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-  const [isResizing, setIsResizing] = useState(false);
   const [showEditPrompt, setShowEditPrompt] = useState(false);
   const [editPrompt, setEditPrompt] = useState(item.prompt);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = I18N[lang];
 
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Resize handle disabled to prevent interference with file upload
+  // const handleResizeStart = (e: React.MouseEvent) => {
+  //   e.stopPropagation();
+  //   e.preventDefault();
+  //   setIsResizing(true);
+  //   const startX = e.clientX;
+  //   const startY = e.clientY;
+  //   const startW = item.width;
+  //   const ratio = item.height / item.width;
+  //   const onMouseMove = (me: MouseEvent) => {
+  //     const nw = Math.max(120, startW + (me.clientX - startX));
+  //     const nh = nw * ratio;
+  //     onAction(item.id, 'resize', { width: nw, height: nh });
+  //   };
+  //   const onMouseUp = () => { setIsResizing(false); window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
+  //   window.addEventListener('mousemove', onMouseMove);
+  //   window.addEventListener('mouseup', onMouseUp);
+  // };
+
+  const handleDragOverQuickAction = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsResizing(true);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startW = item.width;
-    // 使用实际的图片比例，而不是硬编码的比例
-    const ratio = item.height / item.width;
-    const onMouseMove = (me: MouseEvent) => {
-      const nw = Math.max(120, startW + (me.clientX - startX));
-      const nh = nw * ratio;
-      onAction(item.id, 'resize', { width: nw, height: nh });
-    };
-    const onMouseUp = () => { setIsResizing(false); window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    e.stopPropagation();
   };
 
   return (
     <div className={`absolute group transition-shadow duration-300 rounded-[1.5rem] border ${isSelected ? 'z-50 ring-4 ring-purple-600 shadow-2xl' : 'z-10 shadow-lg'} ${theme === 'dark' ? 'bg-[#121216] border-white/5' : 'bg-white border-zinc-200'}`}
       style={{ left: item.x, top: item.y, width: item.width, height: item.height }}
-      onMouseDown={e => { if (e.button === 0 && !isResizing) { e.stopPropagation(); onDragStart(e, item.id); onSelect(item.id, e.shiftKey); } }}
+      onMouseDown={e => { if (e.button === 0) { e.stopPropagation(); onDragStart(e, item.id); onSelect(item.id, e.shiftKey); } }}
       onContextMenu={e => { e.preventDefault(); setMenuPos({ x: e.clientX, y: e.clientY }); setShowMenu(true); }}
-      onDragOver={e => !item.isMain && e.preventDefault()}
-      onDrop={e => { e.preventDefault(); if (item.isMain) return; const rect = e.currentTarget.getBoundingClientRect(); onDropSymbol(item.id, e.dataTransfer.getData('symbolName'), ((e.clientX - rect.left)/rect.width)*100, ((e.clientY - rect.top)/rect.height)*100); }}>
+      onDragOver={e => {
+        if (!item.isMain) {
+          e.preventDefault();
+        }
+      }}
+      onDrop={e => {
+        e.preventDefault();
+        if (item.isMain) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        onDropSymbol(item.id, e.dataTransfer.getData('symbolName'), ((e.clientX - rect.left)/rect.width)*100, ((e.clientY - rect.top)/rect.height)*100);
+      }}>
       
-      <input type="file" ref={fileInputRef} onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => onAction(item.id, 'replace', ev.target?.result); r.readAsDataURL(f); } }} className="hidden" accept="image/*" />
+      <input type="file" ref={fileInputRef} onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => onAction(item.id, 'replace', ev.target?.result); r.readAsDataURL(f); } }} className="hidden" accept="image/*" style={{ display: 'none' }} />
       
       {item.isMain && (
         <div className="absolute -top-10 left-0 flex items-center gap-2 pointer-events-none">
@@ -65,18 +79,24 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
       <div className={`relative h-full w-full overflow-hidden rounded-[1.5rem] bg-black`}>
         <img 
           src={item.imageUrl} 
-          className={`w-full h-full object-cover pointer-events-none transition-transform ${!item.isMain && item.colorMode === 'blackAndWhite' ? 'grayscale contrast-125' : ''}`}
+          className={`w-full h-full object-cover pointer-events-none transition-transform ${!item.isMain && item.colorMode === 'blackAndWhite' ? 'grayscale contrast-125' : ''} ${item.isLoading ? 'opacity-50' : ''}`}
           style={item.isMain && item.scale ? { transform: `scale(${item.scale})`, transformOrigin: 'center' } : {}}
         />
+        {item.isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+              <span className="text-white text-xs font-black uppercase tracking-widest">{lang === 'zh' ? '生成中...' : 'Generating...'}</span>
+            </div>
+          </div>
+        )}
         {!item.isMain && (
           <div className="absolute inset-0 pointer-events-none">
             {item.symbols.map(s => <div key={s.id} className="absolute text-purple-500 font-black text-3xl drop-shadow-md" style={{ left: `${s.x}%`, top: `${s.y}%`, transform: 'translate(-50%, -50%)' }}>{s.label}</div>)}
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur px-2 py-1 rounded text-[10px] font-black text-white">SCENE {String(item.order + 1).padStart(2, '0')}</div>
           </div>
         )}
-        <div className="absolute bottom-1 right-1 w-5 h-5 cursor-nwse-resize z-50 flex items-end justify-end opacity-0 group-hover:opacity-100" onMouseDown={handleResizeStart}>
-          <div className="w-2 h-2 border-r-2 border-b-2 border-white/50" />
-        </div>
+        {/* Resize handle removed to prevent interference with file upload */}
       </div>
 
       {showMenu && (
@@ -96,6 +116,10 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
             ) : (
               !item.isMain && <button onClick={() => { setEditPrompt(item.prompt); setShowEditPrompt(true); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.redrawViewScript}</button>
             )}
+            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'three-view'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '三视图' : 'Three-View'}</button>}
+            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'multi-grid'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多角度' : 'Multi-Grid'}</button>}
+            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'style-comparison'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多风格' : 'Style Comparison'}</button>}
+            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'narrative-progression'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '叙事进展' : 'Narrative Progression'}</button>}
             <button onClick={() => { onAction(item.id, 'copy'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{t.copy}</button>
             {onExportJPEG && <button onClick={() => { onExportJPEG(); setShowMenu(false); }} className="p-3 text-left hover:text-green-500 transition-all">{t.downloadImage}</button>}
             {!item.isMain && onGenerateVideo && <button onClick={() => { onGenerateVideo(); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">🎬 {lang === 'zh' ? '生成视频' : 'Generate Video'}</button>}

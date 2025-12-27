@@ -2,6 +2,35 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScriptScene, ProviderConfig } from "./types";
 
+// ✅ 公共函数：调整场景数量
+const adjustSceneCount = (scenes: any[], targetCount: number): ScriptScene[] => {
+  if (!Array.isArray(scenes)) {
+    console.error('Invalid scenes format');
+    return [];
+  }
+
+  if (scenes.length > targetCount) {
+    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Trimming to ${targetCount}.`);
+    return scenes.slice(0, targetCount);
+  }
+
+  if (scenes.length < targetCount) {
+    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Padding with duplicates.`);
+    const padded = [...scenes];
+    while (padded.length < targetCount) {
+      const lastScene = padded[padded.length - 1];
+      padded.push({
+        index: padded.length,
+        description: lastScene.description + ` (variation ${padded.length - targetCount + 1})`,
+        visualPrompt: lastScene.visualPrompt + ` (variation ${padded.length - targetCount + 1})`
+      });
+    }
+    return padded;
+  }
+
+  return scenes;
+};
+
 const getAppConfig = (): ProviderConfig | null => {
   const saved = localStorage.getItem('director_canvas_api_config');
   if (!saved) return null;
@@ -31,65 +60,73 @@ export const testApiConnection = async (config: ProviderConfig, type: 'llm' | 'i
       });
       return !!response;
     } else {
-      // 通过服务器端 API 测试（避免 CORS 问题）
-      console.log('[testApiConnection] Testing via server for', type, 'with provider', config.provider);
-      
-      const testType = type === 'image' ? 'textToImage' : 'textGeneration';
-      
-      // 构建配置
-      const multimediaConfig = {
-        providers: {
-          [testType]: config.provider
-        },
-        configs: {
-          [config.provider]: {
-            apiKey: config.apiKey,
-            baseUrl: config.baseUrl,
-            endpoints: {}
-          }
-        }
-      };
+      // 直接测试 OpenAI 兼容 API
+      console.log('[testApiConnection] Testing direct API for', type, 'with provider', config.provider);
       
       const endpoint = type === 'image'
-        ? '/api/multimedia?action=text-to-image'
-        : '/api/multimedia?action=text-generation';
+        ? `${config.baseUrl}/v1/images/generations`
+        : `${config.baseUrl}/v1/chat/completions`;
       
+      // 所有API都需要model参数
       const body = type === 'image'
         ? { 
-            prompt: 'test image', 
-            model: config.imageModel,
-            _config: multimediaConfig
+            model: config.imageModel || 'nano-banana',
+            prompt: 'test',
+            response_format: 'url'
           }
         : { 
+            model: config.llmModel || 'gpt-4o',
             messages: [
               { role: 'user', content: 'test' }
-            ],
-            model: config.llmModel,
-            _config: multimediaConfig
+            ]
           };
       
-      console.log('[testApiConnection] Calling server endpoint:', endpoint);
+      console.log('[testApiConnection] Calling endpoint:', endpoint);
+      console.log('[testApiConnection] Request body:', body);
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body)
-      });
-      
-      console.log('[testApiConnection] Server response status:', response.status);
-      
-      if (!response.ok) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`
+          },
+          body: JSON.stringify(body)
+        });
+        
+        console.log('[testApiConnection] Response status:', response.status);
+        
+        // 200-299: 成功
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[testApiConnection] API response success');
+          return true;
+        }
+        
+        // 401: 认证失败 - API Key 无效，但端点存在
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn('[testApiConnection] API authentication failed (401) - Invalid API Key', errorData);
+          return false;
+        }
+        
+        // 404: 端点不存在
+        if (response.status === 404) {
+          const errorText = await response.text();
+          console.error('[testApiConnection] API endpoint not found (404):', errorText);
+          return false;
+        }
+        
+        // 其他错误
         const errorText = await response.text();
-        console.error('[testApiConnection] Server error:', errorText);
+        console.error('[testApiConnection] API error:', response.status, errorText);
+        return false;
+      } catch (fetchError) {
+        // CORS errors 或网络错误 - 这些在浏览器中是预期的
+        console.warn('[testApiConnection] CORS or network error (expected for browser-based API calls):', fetchError);
+        // 对于 CORS 错误，我们无法判断 API 是否真的有效，所以返回 false
         return false;
       }
-      
-      const data = await response.json();
-      console.log('[testApiConnection] Server response success:', data.success);
-      
-      return data.success === true;
     }
   } catch (e) {
     console.error("API Test Failed:", e);
@@ -97,33 +134,8 @@ export const testApiConnection = async (config: ProviderConfig, type: 'llm' | 'i
   }
 };
 
-// CORS 代理列表（按优先级排序）
-const CORS_PROXIES = [
-  'https://cors.bridged.cc/',
-  'https://api.allorigins.win/raw?url=',
-  'https://corsproxy.io/?'
-];
-
-// 获取 CORS 代理 URL
-const getCorsProxyUrl = (url: string, proxyIndex: number = 0): string => {
-  if (proxyIndex >= CORS_PROXIES.length) {
-    return url; // 如果所有代理都用完了，返回原始 URL
-  }
-  
-  const proxy = CORS_PROXIES[proxyIndex];
-  
-  // 不同的代理有不同的 URL 格式
-  if (proxy.includes('allorigins')) {
-    return `${proxy}${encodeURIComponent(url)}`;
-  } else if (proxy.includes('corsproxy')) {
-    return `${proxy}${encodeURIComponent(url)}`;
-  } else {
-    return `${proxy}${url}`;
-  }
-};
-
 // 将 URL 图片转换为 base64（使用 Canvas 方法绕过 CORS）
-const urlToBase64 = async (url: string, proxyIndex: number = 0): Promise<string | null> => {
+const urlToBase64 = async (url: string): Promise<string | null> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -149,26 +161,24 @@ const urlToBase64 = async (url: string, proxyIndex: number = 0): Promise<string 
     
     img.onerror = () => {
       console.error("Image load failed for URL:", url);
-      
-      // 如果直接加载失败，尝试使用 CORS 代理
-      if (proxyIndex < CORS_PROXIES.length) {
-        console.log(`Retrying with CORS proxy ${proxyIndex + 1}...`);
-        const proxyUrl = getCorsProxyUrl(url, proxyIndex);
-        urlToBase64(url, proxyIndex + 1).then(resolve);
-      } else {
-        resolve(null);
-      }
+      resolve(null);
     };
     
     img.src = url;
   });
 };
 
-export const generateSceneImage = async (prompt: string, forceLineArt: boolean = true, isBlackAndWhite: boolean = false, style?: any, aspectRatio?: string): Promise<string | null> => {
+export const generateSceneImage = async (prompt: string, _forceLineArt: boolean = true, isBlackAndWhite: boolean = false, style?: any, aspectRatio?: string, referenceImageUrl?: string): Promise<string | null> => {
   const config = getAppConfig();
   
   // 使用配置中的 API Key，如果没有则使用环境变量
   const apiKey = config?.apiKey || process.env.API_KEY;
+  
+  console.log('[generateSceneImage] Starting image generation');
+  console.log('[generateSceneImage] Config provider:', config?.provider);
+  console.log('[generateSceneImage] Has API Key:', !!apiKey);
+  console.log('[generateSceneImage] Has reference image:', !!referenceImageUrl);
+  console.log('[generateSceneImage] Prompt:', prompt.substring(0, 100) + '...');
   
   let stylePrefix = '';
   
@@ -194,62 +204,295 @@ export const generateSceneImage = async (prompt: string, forceLineArt: boolean =
   try {
     if (config?.provider === 'gemini') {
       // Gemini API
+      console.log('[generateSceneImage] Using Gemini API');
+      if (!apiKey) {
+        console.error('[generateSceneImage] ❌ No API key provided for Gemini');
+        return null;
+      }
+      
       const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+      console.log('[generateSceneImage] Calling Gemini API...');
+      
+      // 构建请求内容
+      const parts: any[] = [];
+      
+      // 如果有参考图片，添加到请求中
+      if (referenceImageUrl) {
+        console.log('[generateSceneImage] Adding reference image to Gemini request');
+        console.log('[generateSceneImage] Reference image URL length:', referenceImageUrl.length);
+        if (referenceImageUrl.startsWith('data:')) {
+          // Base64 格式
+          const base64Data = referenceImageUrl.split(',')[1];
+          const mimeType = referenceImageUrl.split(';')[0].replace('data:', '');
+          console.log('[generateSceneImage] Base64 image detected, MIME type:', mimeType);
+          parts.push({
+            inlineData: {
+              mimeType: mimeType || 'image/png',
+              data: base64Data
+            }
+          });
+        } else if (referenceImageUrl.startsWith('http')) {
+          // URL 格式
+          console.log('[generateSceneImage] HTTP URL image detected:', referenceImageUrl.substring(0, 50) + '...');
+          parts.push({
+            fileData: {
+              mimeType: 'image/png',
+              fileUri: referenceImageUrl
+            }
+          });
+        }
+      }
+      
+      // 添加提示词
+      parts.push({ text: `${stylePrefix} ${prompt}` });
+      
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-image",
         contents: {
-          parts: [{ text: `${stylePrefix} ${prompt}` }]
+          parts: parts
         },
         config: {
           imageConfig: { aspectRatio: aspectRatio || "16:9" }
         }
       });
 
+      console.log('[generateSceneImage] ✓ Gemini API response received');
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
+          console.log('[generateSceneImage] ✓ Image data received from Gemini');
           return `data:image/png;base64,${part.inlineData.data}`;
         }
       }
     } else {
-      // OpenAI 兼容 API（智谱、OpenAI 等）
-      const response = await fetch(`${config?.baseUrl}/images/generations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: config?.imageModel || 'dall-e-3',
-          prompt: `${stylePrefix} ${prompt}`,
-          n: 1,
-          size: '1024x1024'
-        })
-      });
-
-      if (!response.ok) {
-        console.error(`Image generation failed: ${response.status}`);
+      // OpenAI 兼容 API（神马、智谱、OpenAI 等）
+      console.log('[generateSceneImage] Using OpenAI-compatible API');
+      console.log('[generateSceneImage] Base URL:', config?.baseUrl);
+      console.log('[generateSceneImage] Image Model:', config?.imageModel);
+      
+      if (!apiKey) {
+        console.error('[generateSceneImage] ❌ No API key provided');
+        return null;
+      }
+      
+      if (!config?.baseUrl) {
+        console.error('[generateSceneImage] ❌ No base URL configured');
+        return null;
+      }
+      
+      // 如果有参考图片，尝试使用 image-to-image (edits) 端点
+      // 如果失败，则回退到 generations 端点并在提示词中包含参考图片信息
+      if (referenceImageUrl) {
+        console.log('[generateSceneImage] Reference image provided, attempting image-to-image generation');
+        console.log('[generateSceneImage] Reference image URL length:', referenceImageUrl.length);
+        const editsEndpoint = `${config.baseUrl}/v1/images/edits`;
+        
+        try {
+          // 将参考图片转换为 Blob 以便上传
+          let imageBlob: Blob | null = null;
+          
+          if (referenceImageUrl.startsWith('data:')) {
+            // Base64 格式 - 转换为 Blob
+            console.log('[generateSceneImage] Converting base64 image to Blob...');
+            const base64Data = referenceImageUrl.split(',')[1];
+            const mimeType = referenceImageUrl.split(';')[0].replace('data:', '') || 'image/png';
+            console.log('[generateSceneImage] Base64 MIME type:', mimeType);
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            imageBlob = new Blob([bytes], { type: mimeType });
+            console.log('[generateSceneImage] ✓ Blob created, size:', imageBlob.size, 'bytes');
+          } else if (referenceImageUrl.startsWith('http')) {
+            // URL 格式 - 下载并转换为 Blob
+            console.log('[generateSceneImage] Downloading image from URL...');
+            const response = await fetch(referenceImageUrl);
+            if (!response.ok) {
+              throw new Error(`Failed to download image: ${response.status}`);
+            }
+            imageBlob = await response.blob();
+            console.log('[generateSceneImage] ✓ Image downloaded, size:', imageBlob.size, 'bytes');
+          } else {
+            // 本地路径 - 尝试转换为 base64 再转 Blob
+            console.log('[generateSceneImage] Converting local path to Blob...');
+            const base64 = await urlToBase64(referenceImageUrl);
+            if (base64) {
+              const base64Data = base64.split(',')[1];
+              const mimeType = base64.split(';')[0].replace('data:', '') || 'image/png';
+              const binaryString = atob(base64Data);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              imageBlob = new Blob([bytes], { type: mimeType });
+              console.log('[generateSceneImage] ✓ Blob created from local path, size:', imageBlob.size, 'bytes');
+            }
+          }
+          
+          if (imageBlob) {
+            // 尝试使用 edits 端点
+            try {
+              const fullPrompt = `${stylePrefix} ${prompt}`;
+              const formData = new FormData();
+              formData.append('model', config?.imageModel || 'nano-banana');
+              formData.append('prompt', fullPrompt);
+              formData.append('image', imageBlob, 'reference.png');
+              formData.append('aspect_ratio', aspectRatio || '16:9');
+              formData.append('response_format', 'url');
+              
+              console.log('[generateSceneImage] Calling edits endpoint:', editsEndpoint);
+              console.log('[generateSceneImage] FormData fields:');
+              console.log('  - model:', config?.imageModel || 'nano-banana');
+              console.log('  - prompt:', fullPrompt.substring(0, 100) + '...');
+              console.log('  - image blob size:', imageBlob.size, 'bytes');
+              console.log('  - aspect_ratio:', aspectRatio || '16:9');
+              console.log('  - response_format: url');
+              
+              const editResponse = await fetch(editsEndpoint, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${apiKey}`
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: formData
+              });
+              
+              console.log('[generateSceneImage] Edits endpoint response status:', editResponse.status);
+              
+              if (editResponse.ok) {
+                const data = await editResponse.json();
+                console.log('[generateSceneImage] ✓ Edits endpoint response received');
+                const imageUrl = data.data?.[0]?.url;
+                
+                if (imageUrl) {
+                  console.log('[generateSceneImage] Image URL received:', imageUrl.substring(0, 50) + '...');
+                  
+                  // 将 URL 转换为 base64，避免 CORS 问题
+                  console.log("[generateSceneImage] Converting image URL to base64...");
+                  const base64 = await urlToBase64(imageUrl);
+                  if (base64) {
+                    console.log("[generateSceneImage] ✓ Image converted to base64 successfully");
+                    return base64;
+                  } else {
+                    console.warn("[generateSceneImage] Failed to convert to base64, returning URL as fallback");
+                    return imageUrl;
+                  }
+                }
+              } else {
+                const errorText = await editResponse.text();
+                console.warn(`[generateSceneImage] Edits endpoint not available (${editResponse.status}), falling back to generations endpoint`);
+                console.warn('[generateSceneImage] Error response:', errorText.substring(0, 200));
+              }
+            } catch (editsErr) {
+              console.warn('[generateSceneImage] Edits endpoint error, falling back to generations endpoint:', editsErr);
+            }
+          } else {
+            console.warn('[generateSceneImage] Failed to convert reference image to Blob, falling back to generations endpoint');
+          }
+        } catch (err) {
+          console.warn('[generateSceneImage] Error in image-to-image processing, falling back to generations endpoint:', err);
+        }
+      }
+      
+      // 文生图 (generations) 端点
+      const endpoint = `${config.baseUrl}/v1/images/generations`;
+      console.log('[generateSceneImage] Calling generations endpoint:', endpoint);
+      
+      const fullPrompt = `${stylePrefix} ${prompt}`;
+      const requestBody = {
+        model: config?.imageModel || 'nano-banana',
+        prompt: fullPrompt,
+        aspect_ratio: aspectRatio || '16:9',
+        response_format: 'url'
+      };
+      
+      console.log('[generateSceneImage] Request body:');
+      console.log('  - model:', requestBody.model);
+      console.log('  - prompt:', fullPrompt.substring(0, 150) + '...');
+      console.log('  - aspect_ratio:', requestBody.aspect_ratio);
+      console.log('  - response_format:', requestBody.response_format);
+      console.log('[generateSceneImage] Full request body JSON:', JSON.stringify(requestBody, null, 2));
+      console.log('[generateSceneImage] Authorization header: Bearer ' + apiKey.substring(0, 10) + '...');
+      
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          mode: 'cors',
+          credentials: 'omit',
+          body: JSON.stringify(requestBody)
+        });
+      } catch (fetchError) {
+        console.error('[generateSceneImage] ❌ Fetch error (network/CORS issue):', fetchError);
+        console.error('[generateSceneImage] This might be a CORS issue. The API server may not be accepting requests from this domain.');
         return null;
       }
 
-      const data = await response.json();
+      console.log('[generateSceneImage] API response status:', response.status);
+      console.log('[generateSceneImage] API response headers:', {
+        'content-type': response.headers.get('content-type'),
+        'access-control-allow-origin': response.headers.get('access-control-allow-origin')
+      });
+      
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = 'Could not read error response';
+        }
+        console.error(`[generateSceneImage] ❌ Image generation failed: ${response.status}`);
+        console.error('[generateSceneImage] Error response:', errorText);
+        console.error('[generateSceneImage] Full response:', response);
+        return null;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('[generateSceneImage] ❌ Failed to parse JSON response:', parseError);
+        const text = await response.text();
+        console.error('[generateSceneImage] Response text:', text);
+        return null;
+      }
+      
+      console.log('[generateSceneImage] ✓ API response received');
+      console.log('[generateSceneImage] Response data:', JSON.stringify(data, null, 2));
       const imageUrl = data.data?.[0]?.url;
       
-      if (!imageUrl) return null;
+      if (!imageUrl) {
+        console.error('[generateSceneImage] ❌ No image URL in response');
+        console.log('[generateSceneImage] Response data:', data);
+        return null;
+      }
+      
+      console.log('[generateSceneImage] Image URL received:', imageUrl.substring(0, 50) + '...');
       
       // 将 URL 转换为 base64，避免 CORS 问题
-      console.log("Converting image URL to base64...");
+      console.log("[generateSceneImage] Converting image URL to base64...");
       const base64 = await urlToBase64(imageUrl);
       if (base64) {
-        console.log("Image converted to base64 successfully");
+        console.log("[generateSceneImage] ✓ Image converted to base64 successfully");
         return base64;
       } else {
-        console.warn("Failed to convert to base64, returning URL as fallback");
+        console.warn("[generateSceneImage] Failed to convert to base64, returning URL as fallback");
         return imageUrl;
       }
     }
   } catch (err) {
-    console.error("Image generation failed", err);
+    console.error("[generateSceneImage] ❌ Exception during image generation:", err);
+    if (err instanceof Error) {
+      console.error("[generateSceneImage] Error message:", err.message);
+      console.error("[generateSceneImage] Error stack:", err.stack);
+    }
   }
+  console.log("[generateSceneImage] ❌ Returning null - image generation failed");
   return null;
 };
 
@@ -260,10 +503,11 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
   // If using a custom provider that is OpenAI-compatible
   if (config && config.provider !== 'gemini' && config.apiKey) {
     try {
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
         body: JSON.stringify({
@@ -271,40 +515,57 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
           messages: [
             { 
               role: 'system', 
-              content: `You are a script parser. Parse input into ${sceneCount} storyboard scenes. Return a JSON array of objects with keys: index (int), description (string), visualPrompt (string). Do not include markdown code blocks.` 
+              content: `You are a script parser. Parse input into exactly ${sceneCount} storyboard scenes. Return ONLY a valid JSON array of objects with keys: index (int), description (string), visualPrompt (string). Do not include markdown code blocks or any other text.` 
             },
             { role: 'user', content: scriptText }
           ],
           response_format: { type: "json_object" }
         })
       });
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      const parsed = JSON.parse(content);
-      // Handle cases where the response might be nested
-      let scenes = Array.isArray(parsed) ? parsed : (parsed.scenes || Object.values(parsed)[0]);
       
-      // 确保返回的场景数量正确
-      if (Array.isArray(scenes)) {
-        if (scenes.length > sceneCount) {
-          console.warn(`AI returned ${scenes.length} scenes but ${sceneCount} were requested. Trimming to ${sceneCount}.`);
-          scenes = scenes.slice(0, sceneCount);
-        } else if (scenes.length < sceneCount) {
-          console.warn(`AI returned ${scenes.length} scenes but ${sceneCount} were requested. Padding with duplicates.`);
-          while (scenes.length < sceneCount) {
-            const lastScene = scenes[scenes.length - 1];
-            scenes.push({
-              index: scenes.length,
-              description: lastScene.description + ` (variation ${scenes.length - sceneCount + 1})`,
-              visualPrompt: lastScene.visualPrompt + ` (variation ${scenes.length - sceneCount + 1})`
-            });
-          }
+      if (!response.ok) {
+        throw new Error(`API Error (${response.status}): ${await response.text()}`);
+      }
+      
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('Empty response from API');
+      }
+      
+      console.log('[parseScriptToScenes] Raw response:', content);
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseError) {
+        console.error('[parseScriptToScenes] JSON parse failed, attempting text extraction:', parseError);
+        // If JSON parsing fails, try to extract JSON from the text
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Could not extract JSON from response');
         }
       }
       
-      return scenes;
+      // Handle single object response - wrap in array
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        parsed = [parsed];
+      }
+      
+      let scenes = Array.isArray(parsed) ? parsed : (parsed.scenes || Object.values(parsed)[0]);
+      
+      if (!Array.isArray(scenes)) {
+        console.error('[parseScriptToScenes] Invalid scenes format:', scenes);
+        return [];
+      }
+      
+      return adjustSceneCount(scenes, sceneCount);
     } catch (e) {
       console.error("Third-party script parsing failed", e);
+      return [];
     }
   }
 
@@ -330,30 +591,10 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
       }
     }
   });
+  
   try { 
     let scenes = JSON.parse(response.text);
-    
-    // 确保返回的场景数量正确
-    if (Array.isArray(scenes)) {
-      // 如果场景数量不匹配，进行调整
-      if (scenes.length > sceneCount) {
-        console.warn(`AI returned ${scenes.length} scenes but ${sceneCount} were requested. Trimming to ${sceneCount}.`);
-        scenes = scenes.slice(0, sceneCount);
-      } else if (scenes.length < sceneCount) {
-        console.warn(`AI returned ${scenes.length} scenes but ${sceneCount} were requested. Padding with duplicates.`);
-        // 用最后一个场景的变体填充
-        while (scenes.length < sceneCount) {
-          const lastScene = scenes[scenes.length - 1];
-          scenes.push({
-            index: scenes.length,
-            description: lastScene.description + ` (variation ${scenes.length - sceneCount + 1})`,
-            visualPrompt: lastScene.visualPrompt + ` (variation ${scenes.length - sceneCount + 1})`
-          });
-        }
-      }
-    }
-    
-    return scenes;
+    return adjustSceneCount(scenes, sceneCount);
   } catch (e) { 
     console.error("Failed to parse script response:", e);
     return []; 
@@ -380,10 +621,11 @@ export const chatWithGemini = async (messages: any[]) => {
         };
       });
 
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
         body: JSON.stringify({
@@ -514,10 +756,11 @@ Do not include markdown code blocks, just the JSON array.`
 
   if (config && config.provider !== 'gemini' && config.apiKey) {
     try {
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
         body: JSON.stringify({
@@ -529,32 +772,50 @@ Do not include markdown code blocks, just the JSON array.`
           response_format: { type: "json_object" }
         })
       });
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      const parsed = JSON.parse(content);
-      let scenes = Array.isArray(parsed) ? parsed : (parsed.scenes || Object.values(parsed)[0]);
       
-      // 确保返回的场景数量正确
-      if (Array.isArray(scenes)) {
-        if (scenes.length > frameCount) {
-          console.warn(`AI returned ${scenes.length} scenes but ${frameCount} were requested. Trimming to ${frameCount}.`);
-          scenes = scenes.slice(0, frameCount);
-        } else if (scenes.length < frameCount) {
-          console.warn(`AI returned ${scenes.length} scenes but ${frameCount} were requested. Padding with duplicates.`);
-          while (scenes.length < frameCount) {
-            const lastScene = scenes[scenes.length - 1];
-            scenes.push({
-              index: scenes.length,
-              description: lastScene.description + ` (variation ${scenes.length - frameCount + 1})`,
-              visualPrompt: lastScene.visualPrompt + ` (variation ${scenes.length - frameCount + 1})`
-            });
-          }
+      if (!response.ok) {
+        throw new Error(`API Error (${response.status}): ${await response.text()}`);
+      }
+      
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('Empty response from API');
+      }
+      
+      console.log('[generateStoryboardFromDialogue] Raw response:', content);
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch (parseError) {
+        console.error('[generateStoryboardFromDialogue] JSON parse failed, attempting text extraction:', parseError);
+        // If JSON parsing fails, try to extract JSON from the text
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Could not extract JSON from response');
         }
       }
       
-      return scenes;
+      // Handle single object response - wrap in array
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        parsed = [parsed];
+      }
+      
+      let scenes = Array.isArray(parsed) ? parsed : (parsed.scenes || Object.values(parsed)[0]);
+      
+      if (!Array.isArray(scenes)) {
+        console.error('[generateStoryboardFromDialogue] Invalid scenes format:', scenes);
+        return [];
+      }
+      
+      return adjustSceneCount(scenes, frameCount);
     } catch (e) {
       console.error("Third-party dialogue to storyboard failed", e);
+      return [];
     }
   }
 
@@ -579,32 +840,95 @@ Do not include markdown code blocks, just the JSON array.`
       }
     }
   });
+  
   try { 
     let scenes = JSON.parse(response.text);
-    
-    // 确保返回的场景数量正确
-    if (Array.isArray(scenes)) {
-      // 如果场景数量不匹配，进行调整
-      if (scenes.length > frameCount) {
-        console.warn(`AI returned ${scenes.length} scenes but ${frameCount} were requested. Trimming to ${frameCount}.`);
-        scenes = scenes.slice(0, frameCount);
-      } else if (scenes.length < frameCount) {
-        console.warn(`AI returned ${scenes.length} scenes but ${frameCount} were requested. Padding with duplicates.`);
-        // 用最后一个场景的变体填充
-        while (scenes.length < frameCount) {
-          const lastScene = scenes[scenes.length - 1];
-          scenes.push({
-            index: scenes.length,
-            description: lastScene.description + ` (variation ${scenes.length - frameCount + 1})`,
-            visualPrompt: lastScene.visualPrompt + ` (variation ${scenes.length - frameCount + 1})`
-          });
-        }
-      }
-    }
-    
-    return scenes;
+    return adjustSceneCount(scenes, frameCount);
   } catch (e) { 
     console.error("Failed to parse storyboard response:", e);
     return []; 
   }
+};
+
+
+// 图生图API - 编辑图片
+export const editImage = async (
+  imageUrl: string,
+  prompt: string,
+  aspectRatio?: string,
+  responseFormat: 'url' | 'b64_json' = 'url'
+): Promise<string | null> => {
+  const config = getAppConfig();
+  const apiKey = config?.apiKey || process.env.API_KEY;
+
+  try {
+    if (config?.provider === 'gemini') {
+      console.warn('Gemini does not support image editing. Please use nano-banana provider.');
+      return null;
+    }
+
+    // 获取图片文件
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      console.error('Failed to fetch image:', imageResponse.status);
+      return null;
+    }
+    
+    const imageBlob = await imageResponse.blob();
+    
+    const formData = new FormData();
+    formData.append('model', config?.imageModel || 'nano-banana');
+    formData.append('prompt', prompt);
+    formData.append('image', imageBlob, 'image.png');
+    formData.append('response_format', responseFormat);
+    if (aspectRatio) {
+      formData.append('aspect_ratio', aspectRatio);
+    }
+
+    const response = await fetch(`${config?.baseUrl}/v1/images/edits`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+        // 注意: 不要设置 Content-Type，让浏览器自动设置为 multipart/form-data
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Image editing failed: ${response.status}`, errorText);
+      return null;
+    }
+
+    const data = await response.json();
+    const editedImageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+    
+    if (!editedImageUrl) {
+      console.error('No image URL in response');
+      return null;
+    }
+    
+    // 如果是 base64，直接返回
+    if (responseFormat === 'b64_json' && editedImageUrl.startsWith('data:')) {
+      return editedImageUrl;
+    }
+    
+    // 如果是 URL，转换为 base64
+    if (editedImageUrl.startsWith('http')) {
+      console.log("Converting edited image URL to base64...");
+      const base64 = await urlToBase64(editedImageUrl);
+      if (base64) {
+        console.log("Image converted to base64 successfully");
+        return base64;
+      } else {
+        console.warn("Failed to convert to base64, returning URL as fallback");
+        return editedImageUrl;
+      }
+    }
+    
+    return editedImageUrl;
+  } catch (err) {
+    console.error("Image editing failed", err);
+  }
+  return null;
 };

@@ -48,6 +48,7 @@ export interface StoryboardItem {
   scale?: number;
   colorMode?: 'color' | 'blackAndWhite';
   aspectRatio?: string;
+  isLoading?: boolean;
 }
 
 // 工具函数：将比例字符串转换为数字
@@ -119,7 +120,7 @@ export interface VideoServiceConfig {
   apiKey: string;
 }
 
-export type VideoAPIProvider = 'openai' | 'dyu';
+export type VideoAPIProvider = 'openai' | 'dyu' | 'shenma';
 
 export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
   provider?: VideoAPIProvider;
@@ -127,7 +128,7 @@ export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
 
 export interface VideoStatus {
   task_id: string;
-  status: 'NOT_START' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
+  status: 'NOT_START' | 'SUBMITTED' | 'QUEUED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
   progress: string;
   created_at?: number;
   submit_time?: number;
@@ -142,10 +143,21 @@ export interface VideoStatus {
     code: string;
     message: string;
   };
+  // Sora2 特定字段
+  object?: string;
+  created?: number;
+  choices?: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
 }
 
 export interface CreateVideoOptions {
-  model: 'sora-2' | 'sora-2-pro';
+  model: 'sora-2' | 'sora-2-pro' | 'sora_video2' | 'sora_video2-portrait' | 'sora_video2-landscape' | 'sora_video2-portrait-hd' | 'sora_video2-portrait-15s' | 'sora_video2-portrait-hd-15s';
   aspect_ratio?: '16:9' | '9:16';
   duration?: 10 | 15 | 25;
   hd?: boolean;

@@ -48,6 +48,11 @@ export type ActionSymbol = $Result.DefaultSelection<Prisma.$ActionSymbolPayload>
  * 
  */
 export type ActionConfiguration = $Result.DefaultSelection<Prisma.$ActionConfigurationPayload>
+/**
+ * Model MultimediaAPIConfig
+ * 
+ */
+export type MultimediaAPIConfig = $Result.DefaultSelection<Prisma.$MultimediaAPIConfigPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -241,6 +246,16 @@ export class PrismaClient<
     * ```
     */
   get actionConfiguration(): Prisma.ActionConfigurationDelegate<ExtArgs>;
+
+  /**
+   * `prisma.multimediaAPIConfig`: Exposes CRUD operations for the **MultimediaAPIConfig** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MultimediaAPIConfigs
+    * const multimediaAPIConfigs = await prisma.multimediaAPIConfig.findMany()
+    * ```
+    */
+  get multimediaAPIConfig(): Prisma.MultimediaAPIConfigDelegate<ExtArgs>;
 }
 
 export namespace Prisma {
@@ -688,7 +703,8 @@ export namespace Prisma {
     QuickStoryboardConfig: 'QuickStoryboardConfig',
     GenerationHistory: 'GenerationHistory',
     ActionSymbol: 'ActionSymbol',
-    ActionConfiguration: 'ActionConfiguration'
+    ActionConfiguration: 'ActionConfiguration',
+    MultimediaAPIConfig: 'MultimediaAPIConfig'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -704,7 +720,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "user" | "transaction" | "symbol" | "quickStoryboardConfig" | "generationHistory" | "actionSymbol" | "actionConfiguration"
+      modelProps: "user" | "transaction" | "symbol" | "quickStoryboardConfig" | "generationHistory" | "actionSymbol" | "actionConfiguration" | "multimediaAPIConfig"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1198,6 +1214,76 @@ export namespace Prisma {
           }
         }
       }
+      MultimediaAPIConfig: {
+        payload: Prisma.$MultimediaAPIConfigPayload<ExtArgs>
+        fields: Prisma.MultimediaAPIConfigFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.MultimediaAPIConfigFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.MultimediaAPIConfigFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          findFirst: {
+            args: Prisma.MultimediaAPIConfigFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.MultimediaAPIConfigFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          findMany: {
+            args: Prisma.MultimediaAPIConfigFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>[]
+          }
+          create: {
+            args: Prisma.MultimediaAPIConfigCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          createMany: {
+            args: Prisma.MultimediaAPIConfigCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.MultimediaAPIConfigCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>[]
+          }
+          delete: {
+            args: Prisma.MultimediaAPIConfigDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          update: {
+            args: Prisma.MultimediaAPIConfigUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          deleteMany: {
+            args: Prisma.MultimediaAPIConfigDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.MultimediaAPIConfigUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.MultimediaAPIConfigUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MultimediaAPIConfigPayload>
+          }
+          aggregate: {
+            args: Prisma.MultimediaAPIConfigAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateMultimediaAPIConfig>
+          }
+          groupBy: {
+            args: Prisma.MultimediaAPIConfigGroupByArgs<ExtArgs>
+            result: $Utils.Optional<MultimediaAPIConfigGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.MultimediaAPIConfigCountArgs<ExtArgs>
+            result: $Utils.Optional<MultimediaAPIConfigCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1658,6 +1744,7 @@ export namespace Prisma {
     generationHistory?: boolean | User$generationHistoryArgs<ExtArgs>
     actionSymbols?: boolean | User$actionSymbolsArgs<ExtArgs>
     actionConfigurations?: boolean | User$actionConfigurationsArgs<ExtArgs>
+    multimediaAPIConfig?: boolean | User$multimediaAPIConfigArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -1688,6 +1775,7 @@ export namespace Prisma {
     generationHistory?: boolean | User$generationHistoryArgs<ExtArgs>
     actionSymbols?: boolean | User$actionSymbolsArgs<ExtArgs>
     actionConfigurations?: boolean | User$actionConfigurationsArgs<ExtArgs>
+    multimediaAPIConfig?: boolean | User$multimediaAPIConfigArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1701,6 +1789,7 @@ export namespace Prisma {
       generationHistory: Prisma.$GenerationHistoryPayload<ExtArgs>[]
       actionSymbols: Prisma.$ActionSymbolPayload<ExtArgs>[]
       actionConfigurations: Prisma.$ActionConfigurationPayload<ExtArgs>[]
+      multimediaAPIConfig: Prisma.$MultimediaAPIConfigPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -2080,6 +2169,7 @@ export namespace Prisma {
     generationHistory<T extends User$generationHistoryArgs<ExtArgs> = {}>(args?: Subset<T, User$generationHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationHistoryPayload<ExtArgs>, T, "findMany"> | Null>
     actionSymbols<T extends User$actionSymbolsArgs<ExtArgs> = {}>(args?: Subset<T, User$actionSymbolsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ActionSymbolPayload<ExtArgs>, T, "findMany"> | Null>
     actionConfigurations<T extends User$actionConfigurationsArgs<ExtArgs> = {}>(args?: Subset<T, User$actionConfigurationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ActionConfigurationPayload<ExtArgs>, T, "findMany"> | Null>
+    multimediaAPIConfig<T extends User$multimediaAPIConfigArgs<ExtArgs> = {}>(args?: Subset<T, User$multimediaAPIConfigArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2547,6 +2637,21 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ActionConfigurationScalarFieldEnum | ActionConfigurationScalarFieldEnum[]
+  }
+
+  /**
+   * User.multimediaAPIConfig
+   */
+  export type User$multimediaAPIConfigArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    where?: MultimediaAPIConfigWhereInput
   }
 
   /**
@@ -8583,6 +8688,969 @@ export namespace Prisma {
 
 
   /**
+   * Model MultimediaAPIConfig
+   */
+
+  export type AggregateMultimediaAPIConfig = {
+    _count: MultimediaAPIConfigCountAggregateOutputType | null
+    _avg: MultimediaAPIConfigAvgAggregateOutputType | null
+    _sum: MultimediaAPIConfigSumAggregateOutputType | null
+    _min: MultimediaAPIConfigMinAggregateOutputType | null
+    _max: MultimediaAPIConfigMaxAggregateOutputType | null
+  }
+
+  export type MultimediaAPIConfigAvgAggregateOutputType = {
+    userId: number | null
+  }
+
+  export type MultimediaAPIConfigSumAggregateOutputType = {
+    userId: number | null
+  }
+
+  export type MultimediaAPIConfigMinAggregateOutputType = {
+    id: string | null
+    userId: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MultimediaAPIConfigMaxAggregateOutputType = {
+    id: string | null
+    userId: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type MultimediaAPIConfigCountAggregateOutputType = {
+    id: number
+    userId: number
+    config: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type MultimediaAPIConfigAvgAggregateInputType = {
+    userId?: true
+  }
+
+  export type MultimediaAPIConfigSumAggregateInputType = {
+    userId?: true
+  }
+
+  export type MultimediaAPIConfigMinAggregateInputType = {
+    id?: true
+    userId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MultimediaAPIConfigMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type MultimediaAPIConfigCountAggregateInputType = {
+    id?: true
+    userId?: true
+    config?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type MultimediaAPIConfigAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MultimediaAPIConfig to aggregate.
+     */
+    where?: MultimediaAPIConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MultimediaAPIConfigs to fetch.
+     */
+    orderBy?: MultimediaAPIConfigOrderByWithRelationInput | MultimediaAPIConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: MultimediaAPIConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MultimediaAPIConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MultimediaAPIConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned MultimediaAPIConfigs
+    **/
+    _count?: true | MultimediaAPIConfigCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: MultimediaAPIConfigAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: MultimediaAPIConfigSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: MultimediaAPIConfigMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: MultimediaAPIConfigMaxAggregateInputType
+  }
+
+  export type GetMultimediaAPIConfigAggregateType<T extends MultimediaAPIConfigAggregateArgs> = {
+        [P in keyof T & keyof AggregateMultimediaAPIConfig]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateMultimediaAPIConfig[P]>
+      : GetScalarType<T[P], AggregateMultimediaAPIConfig[P]>
+  }
+
+
+
+
+  export type MultimediaAPIConfigGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MultimediaAPIConfigWhereInput
+    orderBy?: MultimediaAPIConfigOrderByWithAggregationInput | MultimediaAPIConfigOrderByWithAggregationInput[]
+    by: MultimediaAPIConfigScalarFieldEnum[] | MultimediaAPIConfigScalarFieldEnum
+    having?: MultimediaAPIConfigScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: MultimediaAPIConfigCountAggregateInputType | true
+    _avg?: MultimediaAPIConfigAvgAggregateInputType
+    _sum?: MultimediaAPIConfigSumAggregateInputType
+    _min?: MultimediaAPIConfigMinAggregateInputType
+    _max?: MultimediaAPIConfigMaxAggregateInputType
+  }
+
+  export type MultimediaAPIConfigGroupByOutputType = {
+    id: string
+    userId: number
+    config: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: MultimediaAPIConfigCountAggregateOutputType | null
+    _avg: MultimediaAPIConfigAvgAggregateOutputType | null
+    _sum: MultimediaAPIConfigSumAggregateOutputType | null
+    _min: MultimediaAPIConfigMinAggregateOutputType | null
+    _max: MultimediaAPIConfigMaxAggregateOutputType | null
+  }
+
+  type GetMultimediaAPIConfigGroupByPayload<T extends MultimediaAPIConfigGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<MultimediaAPIConfigGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof MultimediaAPIConfigGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], MultimediaAPIConfigGroupByOutputType[P]>
+            : GetScalarType<T[P], MultimediaAPIConfigGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type MultimediaAPIConfigSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    config?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["multimediaAPIConfig"]>
+
+  export type MultimediaAPIConfigSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    config?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["multimediaAPIConfig"]>
+
+  export type MultimediaAPIConfigSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    config?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type MultimediaAPIConfigInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type MultimediaAPIConfigIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $MultimediaAPIConfigPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "MultimediaAPIConfig"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: number
+      config: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["multimediaAPIConfig"]>
+    composites: {}
+  }
+
+  type MultimediaAPIConfigGetPayload<S extends boolean | null | undefined | MultimediaAPIConfigDefaultArgs> = $Result.GetResult<Prisma.$MultimediaAPIConfigPayload, S>
+
+  type MultimediaAPIConfigCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<MultimediaAPIConfigFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: MultimediaAPIConfigCountAggregateInputType | true
+    }
+
+  export interface MultimediaAPIConfigDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['MultimediaAPIConfig'], meta: { name: 'MultimediaAPIConfig' } }
+    /**
+     * Find zero or one MultimediaAPIConfig that matches the filter.
+     * @param {MultimediaAPIConfigFindUniqueArgs} args - Arguments to find a MultimediaAPIConfig
+     * @example
+     * // Get one MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends MultimediaAPIConfigFindUniqueArgs>(args: SelectSubset<T, MultimediaAPIConfigFindUniqueArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one MultimediaAPIConfig that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {MultimediaAPIConfigFindUniqueOrThrowArgs} args - Arguments to find a MultimediaAPIConfig
+     * @example
+     * // Get one MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends MultimediaAPIConfigFindUniqueOrThrowArgs>(args: SelectSubset<T, MultimediaAPIConfigFindUniqueOrThrowArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first MultimediaAPIConfig that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigFindFirstArgs} args - Arguments to find a MultimediaAPIConfig
+     * @example
+     * // Get one MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends MultimediaAPIConfigFindFirstArgs>(args?: SelectSubset<T, MultimediaAPIConfigFindFirstArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first MultimediaAPIConfig that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigFindFirstOrThrowArgs} args - Arguments to find a MultimediaAPIConfig
+     * @example
+     * // Get one MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends MultimediaAPIConfigFindFirstOrThrowArgs>(args?: SelectSubset<T, MultimediaAPIConfigFindFirstOrThrowArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more MultimediaAPIConfigs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all MultimediaAPIConfigs
+     * const multimediaAPIConfigs = await prisma.multimediaAPIConfig.findMany()
+     * 
+     * // Get first 10 MultimediaAPIConfigs
+     * const multimediaAPIConfigs = await prisma.multimediaAPIConfig.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const multimediaAPIConfigWithIdOnly = await prisma.multimediaAPIConfig.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends MultimediaAPIConfigFindManyArgs>(args?: SelectSubset<T, MultimediaAPIConfigFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a MultimediaAPIConfig.
+     * @param {MultimediaAPIConfigCreateArgs} args - Arguments to create a MultimediaAPIConfig.
+     * @example
+     * // Create one MultimediaAPIConfig
+     * const MultimediaAPIConfig = await prisma.multimediaAPIConfig.create({
+     *   data: {
+     *     // ... data to create a MultimediaAPIConfig
+     *   }
+     * })
+     * 
+     */
+    create<T extends MultimediaAPIConfigCreateArgs>(args: SelectSubset<T, MultimediaAPIConfigCreateArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many MultimediaAPIConfigs.
+     * @param {MultimediaAPIConfigCreateManyArgs} args - Arguments to create many MultimediaAPIConfigs.
+     * @example
+     * // Create many MultimediaAPIConfigs
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends MultimediaAPIConfigCreateManyArgs>(args?: SelectSubset<T, MultimediaAPIConfigCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many MultimediaAPIConfigs and returns the data saved in the database.
+     * @param {MultimediaAPIConfigCreateManyAndReturnArgs} args - Arguments to create many MultimediaAPIConfigs.
+     * @example
+     * // Create many MultimediaAPIConfigs
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many MultimediaAPIConfigs and only return the `id`
+     * const multimediaAPIConfigWithIdOnly = await prisma.multimediaAPIConfig.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends MultimediaAPIConfigCreateManyAndReturnArgs>(args?: SelectSubset<T, MultimediaAPIConfigCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a MultimediaAPIConfig.
+     * @param {MultimediaAPIConfigDeleteArgs} args - Arguments to delete one MultimediaAPIConfig.
+     * @example
+     * // Delete one MultimediaAPIConfig
+     * const MultimediaAPIConfig = await prisma.multimediaAPIConfig.delete({
+     *   where: {
+     *     // ... filter to delete one MultimediaAPIConfig
+     *   }
+     * })
+     * 
+     */
+    delete<T extends MultimediaAPIConfigDeleteArgs>(args: SelectSubset<T, MultimediaAPIConfigDeleteArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one MultimediaAPIConfig.
+     * @param {MultimediaAPIConfigUpdateArgs} args - Arguments to update one MultimediaAPIConfig.
+     * @example
+     * // Update one MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends MultimediaAPIConfigUpdateArgs>(args: SelectSubset<T, MultimediaAPIConfigUpdateArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more MultimediaAPIConfigs.
+     * @param {MultimediaAPIConfigDeleteManyArgs} args - Arguments to filter MultimediaAPIConfigs to delete.
+     * @example
+     * // Delete a few MultimediaAPIConfigs
+     * const { count } = await prisma.multimediaAPIConfig.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends MultimediaAPIConfigDeleteManyArgs>(args?: SelectSubset<T, MultimediaAPIConfigDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MultimediaAPIConfigs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many MultimediaAPIConfigs
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends MultimediaAPIConfigUpdateManyArgs>(args: SelectSubset<T, MultimediaAPIConfigUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one MultimediaAPIConfig.
+     * @param {MultimediaAPIConfigUpsertArgs} args - Arguments to update or create a MultimediaAPIConfig.
+     * @example
+     * // Update or create a MultimediaAPIConfig
+     * const multimediaAPIConfig = await prisma.multimediaAPIConfig.upsert({
+     *   create: {
+     *     // ... data to create a MultimediaAPIConfig
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the MultimediaAPIConfig we want to update
+     *   }
+     * })
+     */
+    upsert<T extends MultimediaAPIConfigUpsertArgs>(args: SelectSubset<T, MultimediaAPIConfigUpsertArgs<ExtArgs>>): Prisma__MultimediaAPIConfigClient<$Result.GetResult<Prisma.$MultimediaAPIConfigPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of MultimediaAPIConfigs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigCountArgs} args - Arguments to filter MultimediaAPIConfigs to count.
+     * @example
+     * // Count the number of MultimediaAPIConfigs
+     * const count = await prisma.multimediaAPIConfig.count({
+     *   where: {
+     *     // ... the filter for the MultimediaAPIConfigs we want to count
+     *   }
+     * })
+    **/
+    count<T extends MultimediaAPIConfigCountArgs>(
+      args?: Subset<T, MultimediaAPIConfigCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], MultimediaAPIConfigCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a MultimediaAPIConfig.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends MultimediaAPIConfigAggregateArgs>(args: Subset<T, MultimediaAPIConfigAggregateArgs>): Prisma.PrismaPromise<GetMultimediaAPIConfigAggregateType<T>>
+
+    /**
+     * Group by MultimediaAPIConfig.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MultimediaAPIConfigGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends MultimediaAPIConfigGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: MultimediaAPIConfigGroupByArgs['orderBy'] }
+        : { orderBy?: MultimediaAPIConfigGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, MultimediaAPIConfigGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetMultimediaAPIConfigGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the MultimediaAPIConfig model
+   */
+  readonly fields: MultimediaAPIConfigFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for MultimediaAPIConfig.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__MultimediaAPIConfigClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the MultimediaAPIConfig model
+   */ 
+  interface MultimediaAPIConfigFieldRefs {
+    readonly id: FieldRef<"MultimediaAPIConfig", 'String'>
+    readonly userId: FieldRef<"MultimediaAPIConfig", 'Int'>
+    readonly config: FieldRef<"MultimediaAPIConfig", 'Json'>
+    readonly createdAt: FieldRef<"MultimediaAPIConfig", 'DateTime'>
+    readonly updatedAt: FieldRef<"MultimediaAPIConfig", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * MultimediaAPIConfig findUnique
+   */
+  export type MultimediaAPIConfigFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter, which MultimediaAPIConfig to fetch.
+     */
+    where: MultimediaAPIConfigWhereUniqueInput
+  }
+
+  /**
+   * MultimediaAPIConfig findUniqueOrThrow
+   */
+  export type MultimediaAPIConfigFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter, which MultimediaAPIConfig to fetch.
+     */
+    where: MultimediaAPIConfigWhereUniqueInput
+  }
+
+  /**
+   * MultimediaAPIConfig findFirst
+   */
+  export type MultimediaAPIConfigFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter, which MultimediaAPIConfig to fetch.
+     */
+    where?: MultimediaAPIConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MultimediaAPIConfigs to fetch.
+     */
+    orderBy?: MultimediaAPIConfigOrderByWithRelationInput | MultimediaAPIConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MultimediaAPIConfigs.
+     */
+    cursor?: MultimediaAPIConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MultimediaAPIConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MultimediaAPIConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MultimediaAPIConfigs.
+     */
+    distinct?: MultimediaAPIConfigScalarFieldEnum | MultimediaAPIConfigScalarFieldEnum[]
+  }
+
+  /**
+   * MultimediaAPIConfig findFirstOrThrow
+   */
+  export type MultimediaAPIConfigFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter, which MultimediaAPIConfig to fetch.
+     */
+    where?: MultimediaAPIConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MultimediaAPIConfigs to fetch.
+     */
+    orderBy?: MultimediaAPIConfigOrderByWithRelationInput | MultimediaAPIConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MultimediaAPIConfigs.
+     */
+    cursor?: MultimediaAPIConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MultimediaAPIConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MultimediaAPIConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MultimediaAPIConfigs.
+     */
+    distinct?: MultimediaAPIConfigScalarFieldEnum | MultimediaAPIConfigScalarFieldEnum[]
+  }
+
+  /**
+   * MultimediaAPIConfig findMany
+   */
+  export type MultimediaAPIConfigFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter, which MultimediaAPIConfigs to fetch.
+     */
+    where?: MultimediaAPIConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MultimediaAPIConfigs to fetch.
+     */
+    orderBy?: MultimediaAPIConfigOrderByWithRelationInput | MultimediaAPIConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing MultimediaAPIConfigs.
+     */
+    cursor?: MultimediaAPIConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MultimediaAPIConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MultimediaAPIConfigs.
+     */
+    skip?: number
+    distinct?: MultimediaAPIConfigScalarFieldEnum | MultimediaAPIConfigScalarFieldEnum[]
+  }
+
+  /**
+   * MultimediaAPIConfig create
+   */
+  export type MultimediaAPIConfigCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * The data needed to create a MultimediaAPIConfig.
+     */
+    data: XOR<MultimediaAPIConfigCreateInput, MultimediaAPIConfigUncheckedCreateInput>
+  }
+
+  /**
+   * MultimediaAPIConfig createMany
+   */
+  export type MultimediaAPIConfigCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many MultimediaAPIConfigs.
+     */
+    data: MultimediaAPIConfigCreateManyInput | MultimediaAPIConfigCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * MultimediaAPIConfig createManyAndReturn
+   */
+  export type MultimediaAPIConfigCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many MultimediaAPIConfigs.
+     */
+    data: MultimediaAPIConfigCreateManyInput | MultimediaAPIConfigCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MultimediaAPIConfig update
+   */
+  export type MultimediaAPIConfigUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * The data needed to update a MultimediaAPIConfig.
+     */
+    data: XOR<MultimediaAPIConfigUpdateInput, MultimediaAPIConfigUncheckedUpdateInput>
+    /**
+     * Choose, which MultimediaAPIConfig to update.
+     */
+    where: MultimediaAPIConfigWhereUniqueInput
+  }
+
+  /**
+   * MultimediaAPIConfig updateMany
+   */
+  export type MultimediaAPIConfigUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update MultimediaAPIConfigs.
+     */
+    data: XOR<MultimediaAPIConfigUpdateManyMutationInput, MultimediaAPIConfigUncheckedUpdateManyInput>
+    /**
+     * Filter which MultimediaAPIConfigs to update
+     */
+    where?: MultimediaAPIConfigWhereInput
+  }
+
+  /**
+   * MultimediaAPIConfig upsert
+   */
+  export type MultimediaAPIConfigUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * The filter to search for the MultimediaAPIConfig to update in case it exists.
+     */
+    where: MultimediaAPIConfigWhereUniqueInput
+    /**
+     * In case the MultimediaAPIConfig found by the `where` argument doesn't exist, create a new MultimediaAPIConfig with this data.
+     */
+    create: XOR<MultimediaAPIConfigCreateInput, MultimediaAPIConfigUncheckedCreateInput>
+    /**
+     * In case the MultimediaAPIConfig was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<MultimediaAPIConfigUpdateInput, MultimediaAPIConfigUncheckedUpdateInput>
+  }
+
+  /**
+   * MultimediaAPIConfig delete
+   */
+  export type MultimediaAPIConfigDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+    /**
+     * Filter which MultimediaAPIConfig to delete.
+     */
+    where: MultimediaAPIConfigWhereUniqueInput
+  }
+
+  /**
+   * MultimediaAPIConfig deleteMany
+   */
+  export type MultimediaAPIConfigDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MultimediaAPIConfigs to delete
+     */
+    where?: MultimediaAPIConfigWhereInput
+  }
+
+  /**
+   * MultimediaAPIConfig without action
+   */
+  export type MultimediaAPIConfigDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MultimediaAPIConfig
+     */
+    select?: MultimediaAPIConfigSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MultimediaAPIConfigInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -8691,6 +9759,17 @@ export namespace Prisma {
   };
 
   export type ActionConfigurationScalarFieldEnum = (typeof ActionConfigurationScalarFieldEnum)[keyof typeof ActionConfigurationScalarFieldEnum]
+
+
+  export const MultimediaAPIConfigScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    config: 'config',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type MultimediaAPIConfigScalarFieldEnum = (typeof MultimediaAPIConfigScalarFieldEnum)[keyof typeof MultimediaAPIConfigScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -8821,6 +9900,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryListRelationFilter
     actionSymbols?: ActionSymbolListRelationFilter
     actionConfigurations?: ActionConfigurationListRelationFilter
+    multimediaAPIConfig?: XOR<MultimediaAPIConfigNullableRelationFilter, MultimediaAPIConfigWhereInput> | null
   }
 
   export type UserOrderByWithRelationInput = {
@@ -8837,6 +9917,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryOrderByRelationAggregateInput
     actionSymbols?: ActionSymbolOrderByRelationAggregateInput
     actionConfigurations?: ActionConfigurationOrderByRelationAggregateInput
+    multimediaAPIConfig?: MultimediaAPIConfigOrderByWithRelationInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -8856,6 +9937,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryListRelationFilter
     actionSymbols?: ActionSymbolListRelationFilter
     actionConfigurations?: ActionConfigurationListRelationFilter
+    multimediaAPIConfig?: XOR<MultimediaAPIConfigNullableRelationFilter, MultimediaAPIConfigWhereInput> | null
   }, "id" | "username" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -9318,6 +10400,63 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"ActionConfiguration"> | Date | string
   }
 
+  export type MultimediaAPIConfigWhereInput = {
+    AND?: MultimediaAPIConfigWhereInput | MultimediaAPIConfigWhereInput[]
+    OR?: MultimediaAPIConfigWhereInput[]
+    NOT?: MultimediaAPIConfigWhereInput | MultimediaAPIConfigWhereInput[]
+    id?: StringFilter<"MultimediaAPIConfig"> | string
+    userId?: IntFilter<"MultimediaAPIConfig"> | number
+    config?: JsonFilter<"MultimediaAPIConfig">
+    createdAt?: DateTimeFilter<"MultimediaAPIConfig"> | Date | string
+    updatedAt?: DateTimeFilter<"MultimediaAPIConfig"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+  }
+
+  export type MultimediaAPIConfigOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    config?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type MultimediaAPIConfigWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: number
+    AND?: MultimediaAPIConfigWhereInput | MultimediaAPIConfigWhereInput[]
+    OR?: MultimediaAPIConfigWhereInput[]
+    NOT?: MultimediaAPIConfigWhereInput | MultimediaAPIConfigWhereInput[]
+    config?: JsonFilter<"MultimediaAPIConfig">
+    createdAt?: DateTimeFilter<"MultimediaAPIConfig"> | Date | string
+    updatedAt?: DateTimeFilter<"MultimediaAPIConfig"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+  }, "id" | "userId">
+
+  export type MultimediaAPIConfigOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    config?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: MultimediaAPIConfigCountOrderByAggregateInput
+    _avg?: MultimediaAPIConfigAvgOrderByAggregateInput
+    _max?: MultimediaAPIConfigMaxOrderByAggregateInput
+    _min?: MultimediaAPIConfigMinOrderByAggregateInput
+    _sum?: MultimediaAPIConfigSumOrderByAggregateInput
+  }
+
+  export type MultimediaAPIConfigScalarWhereWithAggregatesInput = {
+    AND?: MultimediaAPIConfigScalarWhereWithAggregatesInput | MultimediaAPIConfigScalarWhereWithAggregatesInput[]
+    OR?: MultimediaAPIConfigScalarWhereWithAggregatesInput[]
+    NOT?: MultimediaAPIConfigScalarWhereWithAggregatesInput | MultimediaAPIConfigScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"MultimediaAPIConfig"> | string
+    userId?: IntWithAggregatesFilter<"MultimediaAPIConfig"> | number
+    config?: JsonWithAggregatesFilter<"MultimediaAPIConfig">
+    createdAt?: DateTimeWithAggregatesFilter<"MultimediaAPIConfig"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"MultimediaAPIConfig"> | Date | string
+  }
+
   export type UserCreateInput = {
     username: string
     email: string
@@ -9331,6 +10470,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -9347,6 +10487,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -9362,6 +10503,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -9378,6 +10520,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -9862,6 +11005,61 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type MultimediaAPIConfigCreateInput = {
+    id?: string
+    config: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutMultimediaAPIConfigInput
+  }
+
+  export type MultimediaAPIConfigUncheckedCreateInput = {
+    id?: string
+    userId: number
+    config: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MultimediaAPIConfigUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutMultimediaAPIConfigNestedInput
+  }
+
+  export type MultimediaAPIConfigUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: IntFieldUpdateOperationsInput | number
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MultimediaAPIConfigCreateManyInput = {
+    id?: string
+    userId: number
+    config: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MultimediaAPIConfigUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MultimediaAPIConfigUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: IntFieldUpdateOperationsInput | number
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type IntFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -9944,6 +11142,11 @@ export namespace Prisma {
     every?: ActionConfigurationWhereInput
     some?: ActionConfigurationWhereInput
     none?: ActionConfigurationWhereInput
+  }
+
+  export type MultimediaAPIConfigNullableRelationFilter = {
+    is?: MultimediaAPIConfigWhereInput | null
+    isNot?: MultimediaAPIConfigWhereInput | null
   }
 
   export type TransactionOrderByRelationAggregateInput = {
@@ -10418,6 +11621,36 @@ export namespace Prisma {
     userId?: SortOrder
   }
 
+  export type MultimediaAPIConfigCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    config?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MultimediaAPIConfigAvgOrderByAggregateInput = {
+    userId?: SortOrder
+  }
+
+  export type MultimediaAPIConfigMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MultimediaAPIConfigMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type MultimediaAPIConfigSumOrderByAggregateInput = {
+    userId?: SortOrder
+  }
+
   export type TransactionCreateNestedManyWithoutUserInput = {
     create?: XOR<TransactionCreateWithoutUserInput, TransactionUncheckedCreateWithoutUserInput> | TransactionCreateWithoutUserInput[] | TransactionUncheckedCreateWithoutUserInput[]
     connectOrCreate?: TransactionCreateOrConnectWithoutUserInput | TransactionCreateOrConnectWithoutUserInput[]
@@ -10460,6 +11693,12 @@ export namespace Prisma {
     connect?: ActionConfigurationWhereUniqueInput | ActionConfigurationWhereUniqueInput[]
   }
 
+  export type MultimediaAPIConfigCreateNestedOneWithoutUserInput = {
+    create?: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MultimediaAPIConfigCreateOrConnectWithoutUserInput
+    connect?: MultimediaAPIConfigWhereUniqueInput
+  }
+
   export type TransactionUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<TransactionCreateWithoutUserInput, TransactionUncheckedCreateWithoutUserInput> | TransactionCreateWithoutUserInput[] | TransactionUncheckedCreateWithoutUserInput[]
     connectOrCreate?: TransactionCreateOrConnectWithoutUserInput | TransactionCreateOrConnectWithoutUserInput[]
@@ -10500,6 +11739,12 @@ export namespace Prisma {
     connectOrCreate?: ActionConfigurationCreateOrConnectWithoutUserInput | ActionConfigurationCreateOrConnectWithoutUserInput[]
     createMany?: ActionConfigurationCreateManyUserInputEnvelope
     connect?: ActionConfigurationWhereUniqueInput | ActionConfigurationWhereUniqueInput[]
+  }
+
+  export type MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MultimediaAPIConfigCreateOrConnectWithoutUserInput
+    connect?: MultimediaAPIConfigWhereUniqueInput
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -10602,6 +11847,16 @@ export namespace Prisma {
     deleteMany?: ActionConfigurationScalarWhereInput | ActionConfigurationScalarWhereInput[]
   }
 
+  export type MultimediaAPIConfigUpdateOneWithoutUserNestedInput = {
+    create?: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MultimediaAPIConfigCreateOrConnectWithoutUserInput
+    upsert?: MultimediaAPIConfigUpsertWithoutUserInput
+    disconnect?: MultimediaAPIConfigWhereInput | boolean
+    delete?: MultimediaAPIConfigWhereInput | boolean
+    connect?: MultimediaAPIConfigWhereUniqueInput
+    update?: XOR<XOR<MultimediaAPIConfigUpdateToOneWithWhereWithoutUserInput, MultimediaAPIConfigUpdateWithoutUserInput>, MultimediaAPIConfigUncheckedUpdateWithoutUserInput>
+  }
+
   export type IntFieldUpdateOperationsInput = {
     set?: number
     increment?: number
@@ -10692,6 +11947,16 @@ export namespace Prisma {
     update?: ActionConfigurationUpdateWithWhereUniqueWithoutUserInput | ActionConfigurationUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: ActionConfigurationUpdateManyWithWhereWithoutUserInput | ActionConfigurationUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: ActionConfigurationScalarWhereInput | ActionConfigurationScalarWhereInput[]
+  }
+
+  export type MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+    connectOrCreate?: MultimediaAPIConfigCreateOrConnectWithoutUserInput
+    upsert?: MultimediaAPIConfigUpsertWithoutUserInput
+    disconnect?: MultimediaAPIConfigWhereInput | boolean
+    delete?: MultimediaAPIConfigWhereInput | boolean
+    connect?: MultimediaAPIConfigWhereUniqueInput
+    update?: XOR<XOR<MultimediaAPIConfigUpdateToOneWithWhereWithoutUserInput, MultimediaAPIConfigUpdateWithoutUserInput>, MultimediaAPIConfigUncheckedUpdateWithoutUserInput>
   }
 
   export type UserCreateNestedOneWithoutTransactionsInput = {
@@ -10789,6 +12054,20 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutActionConfigurationsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutActionConfigurationsInput, UserUpdateWithoutActionConfigurationsInput>, UserUncheckedUpdateWithoutActionConfigurationsInput>
+  }
+
+  export type UserCreateNestedOneWithoutMultimediaAPIConfigInput = {
+    create?: XOR<UserCreateWithoutMultimediaAPIConfigInput, UserUncheckedCreateWithoutMultimediaAPIConfigInput>
+    connectOrCreate?: UserCreateOrConnectWithoutMultimediaAPIConfigInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutMultimediaAPIConfigNestedInput = {
+    create?: XOR<UserCreateWithoutMultimediaAPIConfigInput, UserUncheckedCreateWithoutMultimediaAPIConfigInput>
+    connectOrCreate?: UserCreateOrConnectWithoutMultimediaAPIConfigInput
+    upsert?: UserUpsertWithoutMultimediaAPIConfigInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutMultimediaAPIConfigInput, UserUpdateWithoutMultimediaAPIConfigInput>, UserUncheckedUpdateWithoutMultimediaAPIConfigInput>
   }
 
   export type NestedIntFilter<$PrismaModel = never> = {
@@ -11144,6 +12423,25 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type MultimediaAPIConfigCreateWithoutUserInput = {
+    id?: string
+    config: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MultimediaAPIConfigUncheckedCreateWithoutUserInput = {
+    id?: string
+    config: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type MultimediaAPIConfigCreateOrConnectWithoutUserInput = {
+    where: MultimediaAPIConfigWhereUniqueInput
+    create: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+  }
+
   export type TransactionUpsertWithWhereUniqueWithoutUserInput = {
     where: TransactionWhereUniqueInput
     update: XOR<TransactionUpdateWithoutUserInput, TransactionUncheckedUpdateWithoutUserInput>
@@ -11324,6 +12622,31 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ActionConfiguration"> | Date | string
   }
 
+  export type MultimediaAPIConfigUpsertWithoutUserInput = {
+    update: XOR<MultimediaAPIConfigUpdateWithoutUserInput, MultimediaAPIConfigUncheckedUpdateWithoutUserInput>
+    create: XOR<MultimediaAPIConfigCreateWithoutUserInput, MultimediaAPIConfigUncheckedCreateWithoutUserInput>
+    where?: MultimediaAPIConfigWhereInput
+  }
+
+  export type MultimediaAPIConfigUpdateToOneWithWhereWithoutUserInput = {
+    where?: MultimediaAPIConfigWhereInput
+    data: XOR<MultimediaAPIConfigUpdateWithoutUserInput, MultimediaAPIConfigUncheckedUpdateWithoutUserInput>
+  }
+
+  export type MultimediaAPIConfigUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type MultimediaAPIConfigUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateWithoutTransactionsInput = {
     username: string
     email: string
@@ -11336,6 +12659,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutTransactionsInput = {
@@ -11351,6 +12675,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutTransactionsInput = {
@@ -11381,6 +12706,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTransactionsInput = {
@@ -11396,6 +12722,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSymbolsInput = {
@@ -11410,6 +12737,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSymbolsInput = {
@@ -11425,6 +12753,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSymbolsInput = {
@@ -11455,6 +12784,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSymbolsInput = {
@@ -11470,6 +12800,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutQuickStoryboardConfigsInput = {
@@ -11484,6 +12815,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutQuickStoryboardConfigsInput = {
@@ -11499,6 +12831,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutQuickStoryboardConfigsInput = {
@@ -11529,6 +12862,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutQuickStoryboardConfigsInput = {
@@ -11544,6 +12878,7 @@ export namespace Prisma {
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGenerationHistoryInput = {
@@ -11558,6 +12893,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGenerationHistoryInput = {
@@ -11573,6 +12909,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGenerationHistoryInput = {
@@ -11603,6 +12940,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGenerationHistoryInput = {
@@ -11618,6 +12956,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutActionSymbolsInput = {
@@ -11632,6 +12971,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigCreateNestedManyWithoutUserInput
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutActionSymbolsInput = {
@@ -11647,6 +12987,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedCreateNestedManyWithoutUserInput
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutActionSymbolsInput = {
@@ -11677,6 +13018,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUpdateManyWithoutUserNestedInput
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutActionSymbolsInput = {
@@ -11692,6 +13034,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedUpdateManyWithoutUserNestedInput
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutActionConfigurationsInput = {
@@ -11706,6 +13049,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigCreateNestedManyWithoutUserInput
     generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutActionConfigurationsInput = {
@@ -11721,6 +13065,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedCreateNestedManyWithoutUserInput
     generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
     actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutActionConfigurationsInput = {
@@ -11751,6 +13096,7 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUpdateManyWithoutUserNestedInput
     generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutActionConfigurationsInput = {
@@ -11766,6 +13112,85 @@ export namespace Prisma {
     quickStoryboardConfigs?: QuickStoryboardConfigUncheckedUpdateManyWithoutUserNestedInput
     generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
     actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
+    multimediaAPIConfig?: MultimediaAPIConfigUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutMultimediaAPIConfigInput = {
+    username: string
+    email: string
+    password: string
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    transactions?: TransactionCreateNestedManyWithoutUserInput
+    symbols?: SymbolCreateNestedManyWithoutUserInput
+    quickStoryboardConfigs?: QuickStoryboardConfigCreateNestedManyWithoutUserInput
+    generationHistory?: GenerationHistoryCreateNestedManyWithoutUserInput
+    actionSymbols?: ActionSymbolCreateNestedManyWithoutUserInput
+    actionConfigurations?: ActionConfigurationCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutMultimediaAPIConfigInput = {
+    id?: number
+    username: string
+    email: string
+    password: string
+    balance?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    transactions?: TransactionUncheckedCreateNestedManyWithoutUserInput
+    symbols?: SymbolUncheckedCreateNestedManyWithoutUserInput
+    quickStoryboardConfigs?: QuickStoryboardConfigUncheckedCreateNestedManyWithoutUserInput
+    generationHistory?: GenerationHistoryUncheckedCreateNestedManyWithoutUserInput
+    actionSymbols?: ActionSymbolUncheckedCreateNestedManyWithoutUserInput
+    actionConfigurations?: ActionConfigurationUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutMultimediaAPIConfigInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutMultimediaAPIConfigInput, UserUncheckedCreateWithoutMultimediaAPIConfigInput>
+  }
+
+  export type UserUpsertWithoutMultimediaAPIConfigInput = {
+    update: XOR<UserUpdateWithoutMultimediaAPIConfigInput, UserUncheckedUpdateWithoutMultimediaAPIConfigInput>
+    create: XOR<UserCreateWithoutMultimediaAPIConfigInput, UserUncheckedCreateWithoutMultimediaAPIConfigInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutMultimediaAPIConfigInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutMultimediaAPIConfigInput, UserUncheckedUpdateWithoutMultimediaAPIConfigInput>
+  }
+
+  export type UserUpdateWithoutMultimediaAPIConfigInput = {
+    username?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    transactions?: TransactionUpdateManyWithoutUserNestedInput
+    symbols?: SymbolUpdateManyWithoutUserNestedInput
+    quickStoryboardConfigs?: QuickStoryboardConfigUpdateManyWithoutUserNestedInput
+    generationHistory?: GenerationHistoryUpdateManyWithoutUserNestedInput
+    actionSymbols?: ActionSymbolUpdateManyWithoutUserNestedInput
+    actionConfigurations?: ActionConfigurationUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutMultimediaAPIConfigInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    username?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    balance?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    transactions?: TransactionUncheckedUpdateManyWithoutUserNestedInput
+    symbols?: SymbolUncheckedUpdateManyWithoutUserNestedInput
+    quickStoryboardConfigs?: QuickStoryboardConfigUncheckedUpdateManyWithoutUserNestedInput
+    generationHistory?: GenerationHistoryUncheckedUpdateManyWithoutUserNestedInput
+    actionSymbols?: ActionSymbolUncheckedUpdateManyWithoutUserNestedInput
+    actionConfigurations?: ActionConfigurationUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type TransactionCreateManyUserInput = {
@@ -12044,6 +13469,10 @@ export namespace Prisma {
      * @deprecated Use ActionConfigurationDefaultArgs instead
      */
     export type ActionConfigurationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = ActionConfigurationDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use MultimediaAPIConfigDefaultArgs instead
+     */
+    export type MultimediaAPIConfigArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = MultimediaAPIConfigDefaultArgs<ExtArgs>
 
   /**
    * Batch Payload for updateMany & deleteMany & createMany

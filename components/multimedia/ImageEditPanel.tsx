@@ -100,7 +100,7 @@ export const ImageEditPanel: React.FC<ImageEditPanelProps> = ({
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            className="w-full p-2 border rounded-lg"
+            className="hidden"
             disabled={loading}
           />
         </div>
@@ -123,7 +123,7 @@ export const ImageEditPanel: React.FC<ImageEditPanelProps> = ({
             type="file"
             accept="image/*"
             onChange={handleMaskUpload}
-            className="w-full p-2 border rounded-lg"
+            className="hidden"
             disabled={loading}
           />
         </div>

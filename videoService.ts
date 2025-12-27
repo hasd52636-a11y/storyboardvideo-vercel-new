@@ -10,7 +10,7 @@ import {
   CreateCharacterOptions
 } from './types';
 
-export type VideoAPIProvider = 'openai' | 'dyu';
+export type VideoAPIProvider = 'openai' | 'dyu' | 'shenma';
 
 export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
   provider?: VideoAPIProvider;
@@ -39,13 +39,6 @@ class VideoService {
       'Authorization': `Bearer ${this.config.apiKey}`,
       'Content-Type': contentType
     };
-  }
-
-  private getEndpoint(action: string): string {
-    if (this.provider === 'dyu') {
-      return this.getDYUEndpoint(action);
-    }
-    return this.getOpenAIEndpoint(action);
   }
 
   private getOpenAIEndpoint(action: string): string {
@@ -80,6 +73,21 @@ class VideoService {
     }
   }
 
+  private getShenmaEndpoint(action: string): string {
+    const baseUrl = this.config.baseUrl.replace(/\/$/, '');
+    switch (action) {
+      case 'create':
+        // 神马 API 支持 OpenAI 兼容的 sora-video 端点
+        return `${baseUrl}/v2/videos/generations`;
+      case 'status':
+        return `${baseUrl}/v2/videos/generations`;
+      case 'quota':
+        return `${baseUrl}/v1/token/quota`;
+      default:
+        return baseUrl;
+    }
+  }
+
   async createVideo(
     prompt: string,
     options: CreateVideoOptions
@@ -87,6 +95,9 @@ class VideoService {
     try {
       if (this.provider === 'dyu') {
         return this.createVideoDYU(prompt, options);
+      }
+      if (this.provider === 'shenma') {
+        return this.createVideoShenma(prompt, options);
       }
       return this.createVideoOpenAI(prompt, options);
     } catch (error) {
@@ -102,7 +113,7 @@ class VideoService {
     const endpoint = this.getOpenAIEndpoint('create');
 
     const body: any = {
-      model: options.model,
+      model: options.model || 'sora-2',
       prompt: prompt,
       aspect_ratio: options.aspect_ratio || '16:9',
       duration: options.duration || 10,
@@ -218,10 +229,22 @@ class VideoService {
     return 'sora-2';
   }
 
+  private async createVideoShenma(
+    prompt: string,
+    options: CreateVideoOptions
+  ): Promise<{ task_id: string; status: string; progress: string }> {
+    // 神马 API 支持 OpenAI 兼容的 sora-video 端点
+    // 使用 OpenAI 格式而不是 Seedance 格式
+    return this.createVideoOpenAI(prompt, options);
+  }
+
   async getVideoStatus(taskId: string): Promise<VideoStatus> {
     try {
       if (this.provider === 'dyu') {
         return this.getVideoStatusDYU(taskId);
+      }
+      if (this.provider === 'shenma') {
+        return this.getVideoStatusShenma(taskId);
       }
       return this.getVideoStatusOpenAI(taskId);
     } catch (error) {
@@ -311,10 +334,19 @@ class VideoService {
     };
   }
 
+  private async getVideoStatusShenma(taskId: string): Promise<VideoStatus> {
+    // 神马 API 支持 OpenAI 兼容的 /v2/videos/generations 端点
+    // 使用 OpenAI 格式进行状态查询
+    return this.getVideoStatusOpenAI(taskId);
+  }
+
   async getTokenQuota(): Promise<TokenQuota> {
     try {
       if (this.provider === 'dyu') {
         return this.getTokenQuotaDYU();
+      }
+      if (this.provider === 'shenma') {
+        return this.getTokenQuotaShenma();
       }
       return this.getTokenQuotaOpenAI();
     } catch (error) {
@@ -348,6 +380,29 @@ class VideoService {
 
   private async getTokenQuotaDYU(): Promise<TokenQuota> {
     const endpoint = this.getDYUEndpoint('quota');
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: this.buildHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error (${response.status}): ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    const data = JSON.parse(responseText);
+
+    return {
+      total_quota: data.total_quota || 0,
+      used_quota: data.used_quota || 0,
+      remaining_quota: data.remaining_quota || 0
+    };
+  }
+
+  private async getTokenQuotaShenma(): Promise<TokenQuota> {
+    const endpoint = this.getShenmaEndpoint('quota');
 
     const response = await fetch(endpoint, {
       method: 'GET',

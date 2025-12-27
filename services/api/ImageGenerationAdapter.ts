@@ -23,7 +23,12 @@ export interface ImageGenerationAPIConfig {
 export interface IImageGenerationAdapter {
   name: string;
   isAvailable(): Promise<boolean>;
-  generateImages(prompt: string, count?: number): Promise<ImageGenerationAPIResponse>;
+  generateImages(
+    prompt: string,
+    count?: number,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ): Promise<ImageGenerationAPIResponse>;
 }
 
 /**
@@ -46,7 +51,12 @@ export class PrimaryAPIAdapter implements IImageGenerationAdapter {
     return !!this.apiKey;
   }
 
-  async generateImages(prompt: string, count: number = 1): Promise<ImageGenerationAPIResponse> {
+  async generateImages(
+    prompt: string,
+    count: number = 1,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ): Promise<ImageGenerationAPIResponse> {
     try {
       if (!this.apiKey) {
         return {
@@ -58,6 +68,9 @@ export class PrimaryAPIAdapter implements IImageGenerationAdapter {
 
       // TODO: Implement actual API call to Sora/Gemini
       console.log(`[Primary API] Generating ${count} images with prompt: ${prompt}`);
+      if (referenceImage) {
+        console.log(`[Primary API] Using reference image (weight: ${referenceImageWeight || 0.8})`);
+      }
 
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -99,7 +112,12 @@ export class NanobanaAPIAdapter implements IImageGenerationAdapter {
     return !!this.apiKey;
   }
 
-  async generateImages(prompt: string, count: number = 1): Promise<ImageGenerationAPIResponse> {
+  async generateImages(
+    prompt: string,
+    count: number = 1,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ): Promise<ImageGenerationAPIResponse> {
     try {
       if (!this.apiKey) {
         return {
@@ -111,6 +129,9 @@ export class NanobanaAPIAdapter implements IImageGenerationAdapter {
 
       // TODO: Implement actual API call to Nanobanana
       console.log(`[Nanobanana API] Generating ${count} images with prompt: ${prompt}`);
+      if (referenceImage) {
+        console.log(`[Nanobanana API] Using reference image (weight: ${referenceImageWeight || 0.8})`);
+      }
 
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -152,7 +173,12 @@ export class JiMengAPIAdapter implements IImageGenerationAdapter {
     return !!this.apiKey;
   }
 
-  async generateImages(prompt: string, count: number = 1): Promise<ImageGenerationAPIResponse> {
+  async generateImages(
+    prompt: string,
+    count: number = 1,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ): Promise<ImageGenerationAPIResponse> {
     try {
       if (!this.apiKey) {
         return {
@@ -164,6 +190,9 @@ export class JiMengAPIAdapter implements IImageGenerationAdapter {
 
       // TODO: Implement actual API call to 即梦
       console.log(`[即梦 API] Generating ${count} images with prompt: ${prompt}`);
+      if (referenceImage) {
+        console.log(`[即梦 API] Using reference image (weight: ${referenceImageWeight || 0.8})`);
+      }
 
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -204,7 +233,12 @@ export class APIManager {
   /**
    * Generate images with automatic fallback
    */
-  async generateImages(prompt: string, count: number = 1): Promise<ImageGenerationAPIResponse> {
+  async generateImages(
+    prompt: string,
+    count: number = 1,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ): Promise<ImageGenerationAPIResponse> {
     const errors: string[] = [];
 
     // Validate input
@@ -225,6 +259,18 @@ export class APIManager {
       );
     }
 
+    // Validate reference image weight if provided
+    if (referenceImageWeight !== undefined) {
+      if (referenceImageWeight < 0 || referenceImageWeight > 1) {
+        throw new AppError(
+          ErrorCode.INVALID_PARAMETER,
+          'Reference image weight must be between 0 and 1',
+          false,
+          { referenceImageWeight }
+        );
+      }
+    }
+
     // Try each adapter in order
     for (const adapter of this.adapters) {
       try {
@@ -236,7 +282,7 @@ export class APIManager {
 
         console.log(`Attempting to generate images with ${adapter.name}`);
         const response = await ErrorHandler.withRetry(
-          () => adapter.generateImages(prompt, count),
+          () => adapter.generateImages(prompt, count, referenceImage, referenceImageWeight),
           this.maxRetries,
           1000
         );

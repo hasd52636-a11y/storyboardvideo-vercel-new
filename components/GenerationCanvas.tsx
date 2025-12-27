@@ -13,6 +13,7 @@ interface GenerationCanvasProps {
   metadata?: Record<string, any>;
   onSave?: (images: string[], metadata: Record<string, any>) => void;
   onDelete?: () => void;
+  onDropQuickAction?: (cardId: string, actionData: any, referenceImage: string) => void;
 }
 
 export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
@@ -21,8 +22,74 @@ export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
   metadata = {},
   onSave,
   onDelete,
+  onDropQuickAction,
 }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
+
+  const handleDragOverImage = (e: React.DragEvent<HTMLImageElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    
+    // Get the image index from the data attribute
+    const imageIndex = parseInt((e.currentTarget as HTMLImageElement).getAttribute('data-image-index') || '-1');
+    if (imageIndex >= 0) {
+      setDragOverImageIndex(imageIndex);
+    }
+  };
+
+  const handleDragLeaveImage = (e: React.DragEvent<HTMLImageElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverImageIndex(null);
+  };
+
+  const handleDropOnImage = (e: React.DragEvent<HTMLImageElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverImageIndex(null);
+
+    try {
+      // Get the image index
+      const imageIndex = parseInt((e.currentTarget as HTMLImageElement).getAttribute('data-image-index') || '-1');
+      if (imageIndex < 0 || imageIndex >= images.length) {
+        console.error('[GenerationCanvas] Invalid image index:', imageIndex);
+        return;
+      }
+
+      // Get the reference image (the one being dropped on)
+      const referenceImage = images[imageIndex];
+      if (!referenceImage) {
+        console.error('[GenerationCanvas] Reference image not found at index:', imageIndex);
+        return;
+      }
+
+      // Extract drag data
+      const dragDataJson = e.dataTransfer.getData('application/json');
+      if (!dragDataJson) {
+        console.warn('[GenerationCanvas] No drag data found');
+        return;
+      }
+
+      const dragData = JSON.parse(dragDataJson);
+      
+      // Validate it's a quick action
+      if (dragData.type !== 'quick-action') {
+        console.warn('[GenerationCanvas] Drag data is not a quick action:', dragData.type);
+        return;
+      }
+
+      console.log(`[GenerationCanvas] Quick action dropped on image ${imageIndex}:`, dragData);
+
+      // Call the callback with the action data and reference image
+      if (onDropQuickAction) {
+        onDropQuickAction(`image-${imageIndex}`, dragData, referenceImage);
+      }
+    } catch (error) {
+      console.error('[GenerationCanvas] Error handling drop:', error);
+    }
+  };
 
   const renderLayout = () => {
     switch (type) {
@@ -31,15 +98,39 @@ export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
           <div className="layout three-view">
             <div className="view-container">
               <div className="view-label">Front View</div>
-              <img src={images[0]} alt="Front view" />
+              <img 
+                src={images[0]} 
+                alt="Front view"
+                data-image-index="0"
+                onDragOver={handleDragOverImage}
+                onDragLeave={handleDragLeaveImage}
+                onDrop={handleDropOnImage}
+                className={dragOverImageIndex === 0 ? 'drag-over' : ''}
+              />
             </div>
             <div className="view-container">
               <div className="view-label">Side View</div>
-              <img src={images[1]} alt="Side view" />
+              <img 
+                src={images[1]} 
+                alt="Side view"
+                data-image-index="1"
+                onDragOver={handleDragOverImage}
+                onDragLeave={handleDragLeaveImage}
+                onDrop={handleDropOnImage}
+                className={dragOverImageIndex === 1 ? 'drag-over' : ''}
+              />
             </div>
             <div className="view-container">
               <div className="view-label">Top View</div>
-              <img src={images[2]} alt="Top view" />
+              <img 
+                src={images[2]} 
+                alt="Top view"
+                data-image-index="2"
+                onDragOver={handleDragOverImage}
+                onDragLeave={handleDragLeaveImage}
+                onDrop={handleDropOnImage}
+                className={dragOverImageIndex === 2 ? 'drag-over' : ''}
+              />
             </div>
           </div>
         );
@@ -47,19 +138,36 @@ export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
       case 'multi-grid':
         return (
           <div className="layout multi-grid">
-            <img src={images[0]} alt="Grid layout" className="full-width" />
+            <img 
+              src={images[0]} 
+              alt="Grid layout" 
+              className="full-width"
+              data-image-index="0"
+              onDragOver={handleDragOverImage}
+              onDragLeave={handleDragLeaveImage}
+              onDrop={handleDropOnImage}
+              style={dragOverImageIndex === 0 ? { boxShadow: '0 0 10px rgba(102, 126, 234, 0.5)' } : {}}
+            />
           </div>
         );
 
       case 'style-comparison':
         return (
           <div className="layout style-comparison">
-            {images.map((img, idx) => (
+            {images.map((img: string, idx: number) => (
               <div key={idx} className="style-item">
                 <div className="style-label">
                   Style {idx + 1}
                 </div>
-                <img src={img} alt={`Style ${idx + 1}`} />
+                <img 
+                  src={img} 
+                  alt={`Style ${idx + 1}`}
+                  data-image-index={idx.toString()}
+                  onDragOver={handleDragOverImage}
+                  onDragLeave={handleDragLeaveImage}
+                  onDrop={handleDropOnImage}
+                  className={dragOverImageIndex === idx ? 'drag-over' : ''}
+                />
               </div>
             ))}
           </div>
@@ -68,10 +176,18 @@ export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
       case 'narrative-progression':
         return (
           <div className="layout narrative-progression">
-            {images.map((img, idx) => (
+            {images.map((img: string, idx: number) => (
               <div key={idx} className="frame-item">
                 <div className="frame-label">Frame {idx + 1}</div>
-                <img src={img} alt={`Frame ${idx + 1}`} />
+                <img 
+                  src={img} 
+                  alt={`Frame ${idx + 1}`}
+                  data-image-index={idx.toString()}
+                  onDragOver={handleDragOverImage}
+                  onDragLeave={handleDragLeaveImage}
+                  onDrop={handleDropOnImage}
+                  className={dragOverImageIndex === idx ? 'drag-over' : ''}
+                />
               </div>
             ))}
           </div>
@@ -242,6 +358,12 @@ export const GenerationCanvas: React.FC<GenerationCanvasProps> = ({
 
         .layout img:hover {
           transform: scale(1.05);
+        }
+
+        .layout img.drag-over {
+          box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+          border: 2px solid #667eea;
+          transform: scale(1.02);
         }
 
         .full-width {

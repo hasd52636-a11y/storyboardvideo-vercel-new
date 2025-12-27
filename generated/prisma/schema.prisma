@@ -27,6 +27,7 @@ model User {
   generationHistory      GenerationHistory[]
   actionSymbols          ActionSymbol[]
   actionConfigurations   ActionConfiguration[]
+  multimediaAPIConfig    MultimediaAPIConfig?
 
   @@map("users")
 }
@@ -80,14 +81,16 @@ model QuickStoryboardConfig {
 
 // GenerationHistory model - track all generated images
 model GenerationHistory {
-  id        String   @id @default(cuid())
-  userId    Int      @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // 'three-view', 'multi-grid', 'style-comparison', 'narrative-progression'
-  prompt    String
-  images    String[] // URLs or Base64
-  metadata  Json // Additional metadata like grid dimensions, styles used, etc.
-  createdAt DateTime @default(now()) @map("created_at")
+  id                   String   @id @default(cuid())
+  userId               Int      @map("user_id")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                 String // 'three-view', 'multi-grid', 'style-comparison', 'narrative-progression'
+  prompt               String
+  images               String[] // URLs or Base64
+  referenceImage       String? // NEW: Base64 or URL of reference image
+  referenceImageWeight Float? // NEW: Weight of reference image (0.0-1.0)
+  metadata             Json // Additional metadata like grid dimensions, styles used, etc.
+  createdAt            DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([type])
@@ -126,4 +129,17 @@ model ActionConfiguration {
 
   @@index([userId])
   @@map("action_configurations")
+}
+
+// MultimediaAPIConfig model - store user's multimedia API configurations
+model MultimediaAPIConfig {
+  id        String   @id @default(cuid())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  config    Json // Stores the full MultiMediaConfig object
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId])
+  @@map("multimedia_api_configs")
 }

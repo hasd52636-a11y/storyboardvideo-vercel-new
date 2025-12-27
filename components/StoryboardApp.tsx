@@ -33,6 +33,14 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [draggedSymbol, setDraggedSymbol] = useState<Symbol | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [referenceImageForQuickStoryboard, setReferenceImageForQuickStoryboard] = useState<string | null>(null);
+  const [showInputDialogForDrop, setShowInputDialogForDrop] = useState(false);
+  const [dropActionData, setDropActionData] = useState<any>(null);
+  const [dropCardId, setDropCardId] = useState<string | null>(null);
+  const [dropReferenceImage, setDropReferenceImage] = useState<string | null>(null);
+  const [dropInputValue, setDropInputValue] = useState('');
 
   const handleSymbolDrop = (symbol: Symbol) => {
     setDraggedSymbol(symbol);
@@ -40,12 +48,20 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
     console.log(`Symbol dropped: ${symbol.name} in tab: ${activeTab}`);
   };
 
+  const handleImageDrop = (imageUrl: string) => {
+    // When an image is dropped, set it as reference for quick storyboard
+    setReferenceImageForQuickStoryboard(imageUrl);
+    console.log(`[StoryboardApp] Image dropped as reference for quick storyboard:`, imageUrl.substring(0, 50));
+  };
+
   const handleGeneration = (type: string, images: string[], metadata: Record<string, any>) => {
+    console.log(`[StoryboardApp] handleGeneration called with ${images.length} images`);
     setGeneratedContent({
       type,
       images,
       metadata,
     });
+    setGenerationError(null);
   };
 
   const handleSaveGeneration = (images: string[], metadata: Record<string, any>) => {
@@ -55,6 +71,184 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
 
   const handleDeleteGeneration = () => {
     setGeneratedContent(null);
+  };
+
+  const handleQuickActionDropOnCard = (cardId: string, actionData: any, referenceImage: string) => {
+    console.log(`[StoryboardApp] Quick action dropped on card ${cardId}:`, actionData);
+    
+    // If action requires input, show dialog
+    if (actionData.requiresInput) {
+      setDropActionData(actionData);
+      setDropCardId(cardId);
+      setDropReferenceImage(referenceImage);
+      setShowInputDialogForDrop(true);
+      setDropInputValue('');
+      return;
+    }
+    
+    // Otherwise, trigger generation immediately
+    triggerDropGeneration(actionData, referenceImage, {});
+  };
+
+  const handleDropInputSubmit = () => {
+    if (!dropActionData || !dropReferenceImage) return;
+    
+    const frameCount = parseInt(dropInputValue);
+    
+    if (frameCount < dropActionData.inputMin || frameCount > dropActionData.inputMax) {
+      setGenerationError(`Frame count must be between ${dropActionData.inputMin} and ${dropActionData.inputMax}`);
+      return;
+    }
+    
+    triggerDropGeneration(dropActionData, dropReferenceImage, { frameCount: frameCount.toString() });
+    setShowInputDialogForDrop(false);
+    setDropActionData(null);
+    setDropCardId(null);
+    setDropReferenceImage(null);
+    setDropInputValue('');
+  };
+
+  const triggerDropGeneration = async (actionData: any, referenceImage: string, parameters: Record<string, string>) => {
+    try {
+      console.log(`[StoryboardApp] Triggering generation for dropped action: ${actionData.actionType}`);
+      await handleQuickStoryboardGeneration(actionData.actionType, parameters, referenceImage, 0.8);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('[StoryboardApp] Drop generation error:', errorMsg);
+      setGenerationError(errorMsg);
+    }
+  };
+
+  const handleQuickStoryboardGeneration = async (
+    type: string,
+    parameters: Record<string, string>,
+    referenceImage?: string,
+    referenceImageWeight?: number
+  ) => {
+    try {
+      // Import the image generation function
+      const { generateSceneImage } = await import('../geminiService');
+      
+      // Validate that reference image is provided - CRITICAL CHECK
+      if (!referenceImage) {
+        const errorMsg = 'Please upload a reference image to generate storyboard';
+        console.error(`[Quick Storyboard] ❌ ${errorMsg}`);
+        console.error(`[Quick Storyboard] referenceImage value:`, referenceImage);
+        throw new Error(errorMsg);
+      }
+      
+      console.log(`[Quick Storyboard] ✓ Reference image validated, length: ${referenceImage.length}`);
+      
+      let images: string[] = [];
+      let metadata: Record<string, any> = {
+        type,
+        parameters,
+        referenceImageUsed: !!referenceImage,
+      };
+
+      if (referenceImage) {
+        metadata.referenceImageWeight = referenceImageWeight || 0.8;
+      }
+
+      console.log(`[Quick Storyboard] Starting generation for type: ${type}`);
+      if (referenceImage) {
+        console.log(`[Quick Storyboard] Using reference image with weight: ${referenceImageWeight || 0.8}`);
+      }
+
+      if (type === 'three-view') {
+        // Generate three orthographic views
+        const threeViewPrompts = [
+          `Professional cinematic storyboard frame - Front orthographic view. Show a detailed subject from the front with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+          `Professional cinematic storyboard frame - Side orthographic view. Show a detailed subject from the side with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+          `Professional cinematic storyboard frame - Top orthographic view. Show a detailed subject from above with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`
+        ];
+
+        for (let i = 0; i < 3; i++) {
+          try {
+            console.log(`[Quick Storyboard] Generating view ${i + 1}/3...`);
+            const imageUrl = await generateSceneImage(threeViewPrompts[i], true, false, undefined, undefined);
+            if (imageUrl) {
+              console.log(`[Quick Storyboard] ✓ View ${i + 1} generated successfully`);
+              images.push(imageUrl);
+            } else {
+              console.warn(`[Quick Storyboard] ✗ View ${i + 1} returned null`);
+            }
+          } catch (err) {
+            console.error(`[Quick Storyboard] Failed to generate view ${i + 1}:`, err);
+          }
+        }
+      } else if (type === 'multi-grid') {
+        // Generate multi-grid storyboard
+        const frameCount = parseInt(parameters.frameCount || '4');
+        const prompt = `Professional cinematic storyboard - ${frameCount}-frame grid showing a narrative sequence. Each frame shows progression of a dramatic scene with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+        
+        try {
+          console.log(`[Quick Storyboard] Generating multi-grid with ${frameCount} frames...`);
+          const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+          if (imageUrl) {
+            console.log(`[Quick Storyboard] ✓ Multi-grid generated successfully`);
+            images.push(imageUrl);
+          } else {
+            console.warn(`[Quick Storyboard] ✗ Multi-grid returned null`);
+          }
+        } catch (err) {
+          console.error('[Quick Storyboard] Failed to generate multi-grid:', err);
+        }
+      } else if (type === 'style-comparison') {
+        // Generate 5 different artistic styles
+        const styles = ['oil painting', 'watercolor', 'digital art', 'anime', 'photorealistic'];
+        
+        for (let idx = 0; idx < styles.length; idx++) {
+          const style = styles[idx];
+          try {
+            console.log(`[Quick Storyboard] Generating ${style} style (${idx + 1}/${styles.length})...`);
+            const prompt = `Professional cinematic storyboard frame in ${style} artistic style. Show a detailed subject with clear composition, professional lighting, and rich details. High quality artwork. Aspect ratio: 16:9`;
+            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+            if (imageUrl) {
+              console.log(`[Quick Storyboard] ✓ ${style} style generated successfully`);
+              images.push(imageUrl);
+            } else {
+              console.warn(`[Quick Storyboard] ✗ ${style} style returned null`);
+            }
+          } catch (err) {
+            console.error(`[Quick Storyboard] Failed to generate ${style} style:`, err);
+          }
+        }
+      } else if (type === 'narrative-progression') {
+        // Generate sequential narrative frames
+        const frameCount = parseInt(parameters.frameCount || '4');
+        
+        for (let i = 0; i < frameCount; i++) {
+          try {
+            console.log(`[Quick Storyboard] Generating frame ${i + 1}/${frameCount}...`);
+            const prompt = `Professional cinematic storyboard frame ${i + 1} of ${frameCount}. Show a dramatic scene with clear composition, professional lighting, and rich details. Part of a narrative sequence showing story progression. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+            if (imageUrl) {
+              console.log(`[Quick Storyboard] ✓ Frame ${i + 1} generated successfully`);
+              images.push(imageUrl);
+            } else {
+              console.warn(`[Quick Storyboard] ✗ Frame ${i + 1} returned null`);
+            }
+          } catch (err) {
+            console.error(`[Quick Storyboard] Failed to generate frame ${i + 1}:`, err);
+          }
+        }
+      }
+
+      console.log(`[Quick Storyboard] Generation complete. Generated ${images.length} images`);
+
+      if (images.length > 0) {
+        console.log(`[Quick Storyboard] Calling handleGeneration with ${images.length} images`);
+        handleGeneration(type, images, metadata);
+      } else {
+        const errorMsg = 'No images were generated. Please check your API configuration and ensure your API key is valid.';
+        console.error(`[Quick Storyboard] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error('[Quick Storyboard] Generation error:', error);
+      throw error;
+    }
   };
 
   return (
@@ -129,8 +323,23 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
               <div className="tab-pane">
                 <QuickStoryboard
                   userId={userId}
-                  onGenerate={(type, parameters) => {
-                    console.log(`Generating ${type} with parameters:`, parameters);
+                  externalReferenceImage={referenceImageForQuickStoryboard || undefined}
+                  onGenerate={async (type, parameters, referenceImage, referenceImageWeight) => {
+                    setIsGenerating(true);
+                    setGenerationError(null);
+                    try {
+                      await handleQuickStoryboardGeneration(type, parameters, referenceImage, referenceImageWeight);
+                    } catch (error) {
+                      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+                      console.error('[StoryboardApp] Quick storyboard error:', errorMsg);
+                      setGenerationError(errorMsg);
+                    } finally {
+                      setIsGenerating(false);
+                    }
+                  }}
+                  onError={(error) => {
+                    console.error('[StoryboardApp] Quick storyboard error callback:', error);
+                    setGenerationError(error);
                   }}
                 />
               </div>
@@ -146,7 +355,35 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
                 metadata={generatedContent.metadata}
                 onSave={handleSaveGeneration}
                 onDelete={handleDeleteGeneration}
+                onDropQuickAction={handleQuickActionDropOnCard}
               />
+            </div>
+          )}
+
+          {/* Error Display */}
+          {generationError && (
+            <div className="error-section">
+              <div className="error-message">
+                <span className="error-icon">⚠️</span>
+                <div className="error-content">
+                  <h4>Generation Failed</h4>
+                  <p>{generationError}</p>
+                </div>
+                <button 
+                  className="error-close"
+                  onClick={() => setGenerationError(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Loading Indicator */}
+          {isGenerating && (
+            <div className="loading-section">
+              <div className="loading-spinner"></div>
+              <p>Generating images...</p>
             </div>
           )}
 
@@ -164,6 +401,49 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
                   setShowHistory(false);
                 }}
               />
+            </div>
+          )}
+
+          {/* Drop Action Input Dialog */}
+          {showInputDialogForDrop && dropActionData && (
+            <div className="input-dialog-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+              <div style={{ background: 'white', padding: '30px', borderRadius: '8px', maxWidth: '400px', width: '90%' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}>
+                  {dropActionData.actionType === 'multi-grid' ? 'Multi-Grid' : 'Narrative Progression'}
+                </h3>
+                <p style={{ margin: '0 0 15px 0', color: '#666', fontSize: '14px' }}>
+                  {dropActionData.actionType === 'multi-grid' ? 'Number of frames (2-12)' : 'Number of frames (1-12)'}
+                </p>
+                <input
+                  type="number"
+                  value={dropInputValue}
+                  onChange={(e) => setDropInputValue(e.target.value)}
+                  min={dropActionData.inputMin}
+                  max={dropActionData.inputMax}
+                  placeholder="Enter value"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px', marginBottom: '20px', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={handleDropInputSubmit}
+                    style={{ flex: 1, padding: '10px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}
+                  >
+                    Generate
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowInputDialogForDrop(false);
+                      setDropActionData(null);
+                      setDropCardId(null);
+                      setDropReferenceImage(null);
+                      setDropInputValue('');
+                    }}
+                    style={{ flex: 1, padding: '10px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -312,6 +592,95 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           max-height: 600px;
           overflow-y: auto;
+        }
+
+        .error-section {
+          margin-top: 20px;
+          padding: 0;
+        }
+
+        .error-message {
+          display: flex;
+          align-items: flex-start;
+          gap: 15px;
+          padding: 16px;
+          background: #fee;
+          border: 2px solid #f88;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(255, 136, 136, 0.2);
+        }
+
+        .error-icon {
+          font-size: 24px;
+          flex-shrink: 0;
+        }
+
+        .error-content {
+          flex: 1;
+        }
+
+        .error-content h4 {
+          margin: 0 0 8px 0;
+          font-size: 16px;
+          color: #d32f2f;
+          font-weight: bold;
+        }
+
+        .error-content p {
+          margin: 0;
+          font-size: 14px;
+          color: #c62828;
+          line-height: 1.4;
+        }
+
+        .error-close {
+          flex-shrink: 0;
+          background: transparent;
+          border: none;
+          color: #d32f2f;
+          font-size: 20px;
+          cursor: pointer;
+          padding: 0;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.2s;
+        }
+
+        .error-close:hover {
+          color: #b71c1c;
+        }
+
+        .loading-section {
+          margin-top: 20px;
+          padding: 40px;
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          text-align: center;
+        }
+
+        .loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #f0f0f0;
+          border-top: 4px solid #007bff;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .loading-section p {
+          margin: 0;
+          color: #666;
+          font-size: 14px;
         }
 
         @media (max-width: 1200px) {

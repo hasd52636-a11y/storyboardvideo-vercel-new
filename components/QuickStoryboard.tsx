@@ -1,6 +1,7 @@
 /**
  * Quick Storyboard Component
  * Displays four quick-action buttons and editable prompt templates
+ * Supports reference image upload for enhanced generation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -16,21 +17,18 @@ interface QuickStoryboardConfig {
 
 interface QuickStoryboardProps {
   userId: number;
-  onGenerate?: (type: string, parameters: Record<string, string>) => void;
+  onGenerate?: (type: string, parameters: Record<string, string>, referenceImage?: string, referenceImageWeight?: number) => void;
   onError?: (error: string) => void;
+  externalReferenceImage?: string;
 }
 
-type GenerationType = 'three-view' | 'multi-grid' | 'style-comparison' | 'narrative-progression';
+type GenerationType = 'three-view' | 'style-comparison';
 
 interface QuickAction {
   type: GenerationType;
   label: string;
   icon: string;
   description: string;
-  requiresInput: boolean;
-  inputLabel?: string;
-  inputMin?: number;
-  inputMax?: number;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -39,34 +37,12 @@ const QUICK_ACTIONS: QuickAction[] = [
     label: 'Three-View',
     icon: '📐',
     description: 'Generate front, side, and top views',
-    requiresInput: false,
-  },
-  {
-    type: 'multi-grid',
-    label: 'Multi-Grid',
-    icon: '🎬',
-    description: 'Generate N×N grid storyboard',
-    requiresInput: true,
-    inputLabel: 'Number of frames (2-12)',
-    inputMin: 2,
-    inputMax: 12,
   },
   {
     type: 'style-comparison',
     label: 'Style Comparison',
     icon: '🎨',
     description: 'Generate 5 different artistic styles',
-    requiresInput: false,
-  },
-  {
-    type: 'narrative-progression',
-    label: 'Narrative Progression',
-    icon: '📖',
-    description: 'Generate N sequential frames',
-    requiresInput: true,
-    inputLabel: 'Number of frames (1-12)',
-    inputMin: 1,
-    inputMax: 12,
   },
 ];
 
@@ -74,137 +50,13 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
   userId,
   onGenerate,
   onError,
+  externalReferenceImage,
 }) => {
-  const [config, setConfig] = useState<QuickStoryboardConfig | null>(null);
   const [loading, setLoading] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<GenerationType | null>(null);
-  const [templateValues, setTemplateValues] = useState<Record<string, string>>({});
-  const [showInputDialog, setShowInputDialog] = useState(false);
-  const [currentAction, setCurrentAction] = useState<GenerationType | null>(null);
-  const [inputValue, setInputValue] = useState('');
-
-  // Load configuration on mount
-  useEffect(() => {
-    loadConfig();
-  }, [userId]);
-
-  const loadConfig = async () => {
-    setLoading(true);
-
-    try {
-      const response = await fetch(`/api/quick-storyboard?userId=${userId}`);
-      if (!response.ok) {
-        throw new Error('Failed to load configuration');
-      }
-
-      const data = await response.json();
-      setConfig(data.config);
-
-      // Initialize template values
-      if (data.config) {
-        setTemplateValues({
-          threeView: data.config.threeViewTemplate,
-          multiGrid: data.config.multiGridTemplate,
-          styleComparison: data.config.styleComparisonTemplate,
-          narrativeProgression: data.config.narrativeProgressionTemplate,
-        });
-      }
-    } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Failed to load configuration');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleQuickAction = (action: QuickAction) => {
-    if (action.requiresInput) {
-      setCurrentAction(action.type);
-      setShowInputDialog(true);
-    } else {
-      triggerGeneration(action.type, {});
-    }
-  };
-
-  const handleInputSubmit = () => {
-    if (!currentAction) return;
-
-    const frameCount = parseInt(inputValue);
-    const action = QUICK_ACTIONS.find((a) => a.type === currentAction);
-
-    if (!action || !action.inputMin || !action.inputMax) {
-      onError?.('Invalid action');
-      return;
-    }
-
-    if (frameCount < action.inputMin || frameCount > action.inputMax) {
-      onError?.(
-        `Frame count must be between ${action.inputMin} and ${action.inputMax}`
-      );
-      return;
-    }
-
-    triggerGeneration(currentAction, { frameCount: frameCount.toString() });
-    setShowInputDialog(false);
-    setInputValue('');
-  };
-
-  const triggerGeneration = (type: GenerationType, parameters: Record<string, string>) => {
-    onGenerate?.(type, parameters);
-  };
-
-  const handleEditTemplate = (type: GenerationType) => {
-    setEditingTemplate(type);
-  };
-
-  const handleSaveTemplate = async (type: GenerationType, newTemplate: string) => {
-    if (!config) return;
-
-    try {
-      const response = await fetch(`/api/quick-storyboard/${config.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          [`${type}Template`]: newTemplate,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save template');
-      }
-
-      setTemplateValues((prev) => ({
-        ...prev,
-        [type]: newTemplate,
-      }));
-
-      setEditingTemplate(null);
-    } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Failed to save template');
-    }
-  };
-
-  const handleResetTemplate = async (type: GenerationType) => {
-    if (!config) return;
-
-    try {
-      const response = await fetch(`/api/quick-storyboard/${config.id}/reset-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          templateType: type,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to reset template');
-      }
-
-      await loadConfig();
-    } catch (error) {
-      onError?.(error instanceof Error ? error.message : 'Failed to reset template');
-    }
+    // Trigger generation with action type
+    onGenerate?.(action.type, {});
   };
 
   if (loading) {
@@ -215,7 +67,7 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
     <div className="quick-storyboard">
       <div className="quick-storyboard-header">
         <h2>Quick Storyboard</h2>
-        <p>One-click generation with customizable templates</p>
+        <p>Access from right-click context menu on any storyboard card</p>
       </div>
 
       <div className="quick-actions-grid">
@@ -229,98 +81,10 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
               <span className="action-icon">{action.icon}</span>
               <span className="action-label">{action.label}</span>
             </button>
-
-            <div className="template-section">
-              <div className="template-header">
-                <h4>Template</h4>
-                <button
-                  className="btn-edit-template"
-                  onClick={() => handleEditTemplate(action.type)}
-                >
-                  Edit
-                </button>
-              </div>
-
-              {editingTemplate === action.type ? (
-                <div className="template-editor">
-                  <textarea
-                    defaultValue={templateValues[action.type] || ''}
-                    onChange={(e) => {
-                      setTemplateValues((prev) => ({
-                        ...prev,
-                        [action.type]: e.target.value,
-                      }));
-                    }}
-                    rows={3}
-                  />
-                  <div className="editor-actions">
-                    <button
-                      className="btn-save"
-                      onClick={() =>
-                        handleSaveTemplate(
-                          action.type,
-                          templateValues[action.type] || ''
-                        )
-                      }
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="btn-reset"
-                      onClick={() => handleResetTemplate(action.type)}
-                    >
-                      Reset
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={() => setEditingTemplate(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="template-preview">{templateValues[action.type]}</p>
-              )}
-            </div>
+            <p className="action-description">{action.description}</p>
           </div>
         ))}
       </div>
-
-      {showInputDialog && currentAction && (
-        <div className="input-dialog-overlay">
-          <div className="input-dialog">
-            <h3>
-              {QUICK_ACTIONS.find((a) => a.type === currentAction)?.label}
-            </h3>
-            <p>
-              {QUICK_ACTIONS.find((a) => a.type === currentAction)?.inputLabel}
-            </p>
-            <input
-              type="number"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              min={QUICK_ACTIONS.find((a) => a.type === currentAction)?.inputMin}
-              max={QUICK_ACTIONS.find((a) => a.type === currentAction)?.inputMax}
-              placeholder="Enter value"
-            />
-            <div className="dialog-actions">
-              <button className="btn-submit" onClick={handleInputSubmit}>
-                Generate
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => {
-                  setShowInputDialog(false);
-                  setInputValue('');
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         .quick-storyboard {
@@ -353,7 +117,7 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
 
         .quick-actions-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
           gap: 20px;
         }
 
@@ -362,6 +126,7 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
           border-radius: 8px;
           padding: 20px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          text-align: center;
         }
 
         .action-button {
@@ -395,168 +160,10 @@ export const QuickStoryboard: React.FC<QuickStoryboardProps> = ({
           font-size: 16px;
         }
 
-        .template-section {
-          border-top: 1px solid #eee;
-          padding-top: 15px;
-        }
-
-        .template-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
-        }
-
-        .template-header h4 {
-          margin: 0;
-          font-size: 14px;
-          color: #333;
-        }
-
-        .btn-edit-template {
-          padding: 5px 10px;
-          background: #007bff;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 12px;
-        }
-
-        .btn-edit-template:hover {
-          background: #0056b3;
-        }
-
-        .template-preview {
+        .action-description {
           margin: 0;
           font-size: 12px;
           color: #666;
-          background: #f9f9f9;
-          padding: 10px;
-          border-radius: 4px;
-          font-family: monospace;
-          line-height: 1.4;
-        }
-
-        .template-editor {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .template-editor textarea {
-          width: 100%;
-          padding: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 12px;
-          resize: vertical;
-        }
-
-        .editor-actions {
-          display: flex;
-          gap: 8px;
-        }
-
-        .btn-save,
-        .btn-reset,
-        .btn-cancel {
-          flex: 1;
-          padding: 8px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 12px;
-        }
-
-        .btn-save {
-          background: #28a745;
-          color: white;
-        }
-
-        .btn-save:hover {
-          background: #218838;
-        }
-
-        .btn-reset {
-          background: #ffc107;
-          color: #333;
-        }
-
-        .btn-reset:hover {
-          background: #e0a800;
-        }
-
-        .btn-cancel {
-          background: #6c757d;
-          color: white;
-        }
-
-        .btn-cancel:hover {
-          background: #5a6268;
-        }
-
-        .input-dialog-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-
-        .input-dialog {
-          background: white;
-          padding: 30px;
-          border-radius: 8px;
-          max-width: 400px;
-          width: 90%;
-        }
-
-        .input-dialog h3 {
-          margin-top: 0;
-          margin-bottom: 15px;
-        }
-
-        .input-dialog p {
-          margin: 0 0 15px 0;
-          color: #666;
-          font-size: 14px;
-        }
-
-        .input-dialog input {
-          width: 100%;
-          padding: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 16px;
-          margin-bottom: 20px;
-          box-sizing: border-box;
-        }
-
-        .dialog-actions {
-          display: flex;
-          gap: 10px;
-        }
-
-        .btn-submit {
-          flex: 1;
-          padding: 10px;
-          background: #007bff;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-
-        .btn-submit:hover {
-          background: #0056b3;
         }
       `}</style>
     </div>

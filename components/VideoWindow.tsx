@@ -149,11 +149,21 @@ export default function VideoWindow({
           <video
             src={item.videoUrl}
             controls
+            controlsList="nodownload"
             crossOrigin="anonymous"
+            preload="metadata"
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover'
+              objectFit: 'contain',
+              backgroundColor: '#000'
+            }}
+            onError={(e) => {
+              console.error('Video playback error:', e);
+              console.error('Video URL:', item.videoUrl);
+            }}
+            onLoadedMetadata={() => {
+              console.log('Video loaded successfully:', item.videoUrl);
             }}
           />
         )}

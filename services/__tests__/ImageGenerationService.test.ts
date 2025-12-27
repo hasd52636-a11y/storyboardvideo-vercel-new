@@ -238,5 +238,186 @@ describe('ImageGenerationService', () => {
       expect(result[0].type).toBe('three-view');
       expect(result[1].type).toBe('multi-grid');
     });
+
+    // NEW: Reference Image Tests
+    it('should accept generation request without reference image (backward compatibility)', async () => {
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: false },
+        referenceImage: null,
+        referenceImageWeight: null,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      const result = await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views',
+        parameters: {},
+      });
+
+      expect(result.id).toBe('test-id');
+      expect(result.images).toHaveLength(3);
+    });
+
+    it('should accept generation request with valid base64 reference image', async () => {
+      const base64Image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA==';
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views based on reference',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: true, referenceImageWeight: 0.8 },
+        referenceImage: base64Image,
+        referenceImageWeight: 0.8,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      const result = await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views based on reference',
+        parameters: {},
+        referenceImage: base64Image,
+        referenceImageWeight: 0.8,
+      });
+
+      expect(result.id).toBe('test-id');
+      expect(result.images).toHaveLength(3);
+    });
+
+    it('should accept generation request with valid URL reference image', async () => {
+      const imageUrl = 'https://example.com/image.jpg';
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views based on reference',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: true, referenceImageWeight: 0.8 },
+        referenceImage: imageUrl,
+        referenceImageWeight: 0.8,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      const result = await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views based on reference',
+        parameters: {},
+        referenceImage: imageUrl,
+        referenceImageWeight: 0.8,
+      });
+
+      expect(result.id).toBe('test-id');
+    });
+
+    it('should reject generation request with invalid reference image', async () => {
+      await expect(
+        service.generateImages({
+          type: 'three-view',
+          userId: 1,
+          template: 'Generate three views',
+          parameters: {},
+          referenceImage: 'invalid-image-data',
+        })
+      ).rejects.toThrow('Reference image must be a valid base64 string or URL');
+    });
+
+    it('should treat empty reference image as no reference image (backward compatible)', async () => {
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: false },
+        referenceImage: null,
+        referenceImageWeight: null,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      const result = await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views',
+        parameters: {},
+        referenceImage: '',
+      });
+
+      expect(result.id).toBe('test-id');
+      expect(result.images).toHaveLength(3);
+    });
+
+    it('should include reference image in metadata when provided', async () => {
+      const base64Image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA==';
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: true, referenceImageWeight: 0.9 },
+        referenceImage: base64Image,
+        referenceImageWeight: 0.9,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views',
+        parameters: {},
+        referenceImage: base64Image,
+        referenceImageWeight: 0.9,
+      });
+
+      const createCall = vi.mocked(prisma.generationHistory.create).mock.calls[0];
+      expect(createCall[0].data.referenceImage).toBe(base64Image);
+      expect(createCall[0].data.referenceImageWeight).toBe(0.9);
+    });
+
+    it('should use default reference image weight if not provided', async () => {
+      const base64Image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA==';
+      const mockGeneration = {
+        id: 'test-id',
+        userId: 1,
+        type: 'three-view',
+        prompt: 'Generate three views',
+        images: ['front.jpg', 'side.jpg', 'top.jpg'],
+        metadata: { referenceImageUsed: true, referenceImageWeight: 0.8 },
+        referenceImage: base64Image,
+        referenceImageWeight: 0.8,
+        createdAt: new Date(),
+      };
+
+      vi.mocked(prisma.generationHistory.create).mockResolvedValueOnce(mockGeneration);
+
+      await service.generateImages({
+        type: 'three-view',
+        userId: 1,
+        template: 'Generate three views',
+        parameters: {},
+        referenceImage: base64Image,
+      });
+
+      const createCall = vi.mocked(prisma.generationHistory.create).mock.calls[0];
+      expect(createCall[0].data.referenceImageWeight).toBeUndefined();
+    });
   });
 });

@@ -462,7 +462,11 @@ export class APIConfigManager implements IConfigManager {
             return dbConfig.config as MultiMediaConfig;
           }
         } finally {
-          await prisma.$disconnect();
+          try {
+            await prisma.$disconnect();
+          } catch (disconnectError) {
+            this.logger.warn(`[APIConfigManager] Failed to disconnect Prisma:`, disconnectError);
+          }
         }
       } catch (error) {
         this.logger.warn(`[APIConfigManager] Failed to load config from database:`, error);

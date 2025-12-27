@@ -198,6 +198,14 @@ exports.Prisma.ActionConfigurationScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.MultimediaAPIConfigScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  config: 'config',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -231,7 +239,8 @@ exports.Prisma.ModelName = {
   QuickStoryboardConfig: 'QuickStoryboardConfig',
   GenerationHistory: 'GenerationHistory',
   ActionSymbol: 'ActionSymbol',
-  ActionConfiguration: 'ActionConfiguration'
+  ActionConfiguration: 'ActionConfiguration',
+  MultimediaAPIConfig: 'MultimediaAPIConfig'
 };
 
 /**

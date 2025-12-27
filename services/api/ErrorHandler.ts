@@ -24,6 +24,11 @@ export enum ErrorCode {
   MISSING_REQUIRED_FIELD = 'MISSING_REQUIRED_FIELD',
   INVALID_PARAMETER = 'INVALID_PARAMETER',
 
+  // Reference image errors
+  INVALID_IMAGE_FORMAT = 'INVALID_IMAGE_FORMAT',
+  IMAGE_TOO_LARGE = 'IMAGE_TOO_LARGE',
+  IMAGE_VALIDATION_FAILED = 'IMAGE_VALIDATION_FAILED',
+
   // API errors
   API_UNAVAILABLE = 'API_UNAVAILABLE',
   API_TIMEOUT = 'API_TIMEOUT',
@@ -130,6 +135,11 @@ export class ErrorHandler {
    */
   static getUserFriendlyMessage(technicalMessage: string): string {
     const messages: Record<string, string> = {
+      'unsupported image format': 'The image format is not supported. Please use JPEG, PNG, WebP, or GIF.',
+      'image is too large': 'The image file is too large. Maximum size is 5MB.',
+      'invalid base64': 'The image data is corrupted or invalid. Please try a different image.',
+      'invalid url': 'The image URL is invalid. Please check the URL and try again.',
+      'reference image': 'The API does not support reference images. Generating without reference image.',
       'API key not configured': 'Image generation service is not properly configured',
       'Template is required': 'Please provide a valid template',
       'Frame count must be': 'Please provide a valid frame count (2-12)',

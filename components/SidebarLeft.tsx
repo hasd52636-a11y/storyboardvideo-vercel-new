@@ -39,7 +39,7 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
   ];
 
   return (
-    <div className={`fixed left-8 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-5 p-3 backdrop-blur-xl border rounded-[2rem] shadow-2xl items-center ${theme === 'dark' ? 'bg-zinc-900/70 border-white/10' : 'bg-white/90 border-zinc-200 shadow-zinc-300/50'}`}>
+    <div className={`fixed left-8 top-80 z-50 flex flex-col gap-5 p-3 backdrop-blur-xl border rounded-[2rem] shadow-2xl items-center max-h-[calc(100vh-14rem)] overflow-visible ${theme === 'dark' ? 'bg-zinc-900/70 border-white/10' : 'bg-white/90 border-zinc-200 shadow-zinc-300/50'}`}>
       <div className="flex flex-col gap-3 items-center">
         {tools.map((tool) => (
           <button 
@@ -54,7 +54,7 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
       </div>
       <div className={`h-[2px] w-8 ${theme === 'dark' ? 'bg-white/10' : 'bg-zinc-100'}`}></div>
       
-      <div className="relative flex justify-center" ref={menuRef}>
+      <div className="relative" ref={menuRef}>
         <button 
           onClick={() => setShowImportMenu(!showImportMenu)} 
           title={lang === 'zh' ? '上传图片\n点击打开菜单选择上传类型' : 'Upload Images\nClick to open menu'}
@@ -63,17 +63,17 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
           📥
         </button>
         {showImportMenu && (
-          <div className={`absolute left-full ml-4 top-0 p-3 border rounded-2xl shadow-2xl flex flex-col gap-2 w-48 animate-in slide-in-from-left-2 duration-200 ${theme === 'dark' ? 'bg-zinc-900 border-white/10' : 'bg-white border-zinc-200 shadow-zinc-300/50'}`}>
+          <div className={`absolute left-20 top-0 p-3 border rounded-2xl shadow-2xl flex flex-col gap-2 w-48 z-[100] ${theme === 'dark' ? 'bg-zinc-900 border-white/10' : 'bg-white border-zinc-200 shadow-zinc-300/50'}`}>
             <p className="text-[9px] font-black uppercase tracking-widest opacity-40 px-3 mb-1">{lang === 'zh' ? '选择上传类型' : 'Select Upload Type'}</p>
             <button 
-              onClick={() => { onImport('ref'); setShowImportMenu(false); }} 
+              onClick={() => { setShowImportMenu(false); onImport('ref'); }} 
               title={lang === 'zh' ? '上传参考主体 (最多1张)' : 'Upload reference subject (max 1)'}
               className={`px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all text-red-500 border border-red-500/20`}
             >
               {t.importImage}
             </button>
             <button 
-              onClick={() => { onImport('frame'); setShowImportMenu(false); }} 
+              onClick={() => { setShowImportMenu(false); onImport('frame'); }} 
               title={lang === 'zh' ? '上传分镜图片 (最多6张)' : 'Upload storyboard frames (max 6)'}
               className={`px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-500 hover:text-white transition-all text-purple-500 border border-purple-500/20`}
             >
@@ -100,10 +100,6 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
       >
         {colorMode === 'color' ? '🌸' : '⚫'}
       </button>
-
-      <div className={`flex items-center justify-center border px-3 py-2 rounded-2xl ${theme === 'dark' ? 'bg-zinc-900/50 border-white/5' : 'bg-white/50 border-zinc-300 shadow-sm'}`} title={lang === 'zh' ? '缩放比例\n快捷键: Ctrl + 滚轮' : 'Zoom Level\nShortcut: Ctrl + Scroll'}>
-        <span className="text-xs font-black w-12 text-center">{zoom}%</span>
-      </div>
 
       <button 
         onClick={() => onThemeChange(theme === 'dark' ? 'light' : 'dark')} 

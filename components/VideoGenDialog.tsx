@@ -28,7 +28,7 @@ export default function VideoGenDialog({
 }: VideoGenDialogProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2-pro');
+  const [model, setModel] = useState<'sora-2' | 'sora-2-pro'>('sora-2');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [duration, setDuration] = useState(10);
   const [hd, setHd] = useState(false);
@@ -38,38 +38,18 @@ export default function VideoGenDialog({
     setPrompt(initialPrompt);
   }, [initialPrompt]);
 
-  // Build structured prompt from selected frames or use optimized prompts
-  const buildStructuredPrompt = () => {
-    // 优先使用优化后的提示词（来自 getOptimizedPrompts）
-    if (optimizedPrompts && optimizedPrompts[lang]) {
-      return optimizedPrompts[lang];
-    }
-    
-    if (selectedFrames.length === 0) return prompt;
-
-    const prompts = selectedFrames.map((frame, index) => {
-      // Extract action from frame prompt (first line or main description)
-      const action = frame.prompt.split('\n')[0] || frame.prompt;
-
-      // Get camera movements from symbols (only camera-related symbols)
-      const cameraSymbols = frame.symbols
-        .filter(s => ['pan-left', 'pan-right', 'tilt-up', 'tilt-down', 'zoom-in', 'zoom-out', 'hitchcock', 'pov-shot'].includes(s.name))
-        .map(s => symbolDescriptions[lang]?.[s.name] || s.name)
-        .join(', ');
-
-      const cameraMovement = cameraSymbols || (lang === 'zh' ? '无' : 'None');
-
-      return `[动作]: ${action}\n[运镜]: ${cameraMovement}`;
-    }).join('\n\n');
-
-    return prompts;
-  };
-
-  const finalPrompt = buildStructuredPrompt();
-
   const handleGenerate = async () => {
-    // 如果有自定义提示词，使用自定义的；否则使用自动生成的或手动输入的
-    const promptToUse = customPrompt.trim() || (selectedFrames.length > 0 ? finalPrompt : prompt);
+    // 图生图模式：如果有选中的分镜，使用简洁的动作描述
+    // 纯文本模式：使用完整的提示词
+    let promptToUse: string;
+    
+    if (selectedFrames.length > 0) {
+      // 图生图模式：使用自定义提示词或简洁的动作描述
+      promptToUse = customPrompt.trim() || prompt.trim();
+    } else {
+      // 纯文本模式：使用完整的提示词
+      promptToUse = customPrompt.trim() || prompt.trim();
+    }
 
     if (!promptToUse.trim()) {
       alert(lang === 'zh' ? '请输入视频提示词' : 'Please enter video prompt');
@@ -126,11 +106,14 @@ export default function VideoGenDialog({
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
             {lang === 'zh' ? '视频提示词' : 'Video Prompt'}
+            {selectedFrames.length > 0 && <span style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>({lang === 'zh' ? '图生图模式' : 'Image-to-Video'})</span>}
           </label>
           <textarea
-            value={customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)}
+            value={customPrompt || prompt}
             onChange={(e) => setCustomPrompt(e.target.value.slice(0, 760))}
-            placeholder={lang === 'zh' ? '描述你想要生成的视频内容...' : 'Describe the video content you want to generate...'}
+            placeholder={selectedFrames.length > 0 
+              ? (lang === 'zh' ? '描述视频中的动作、效果等...' : 'Describe actions, effects, etc...')
+              : (lang === 'zh' ? '描述你想要生成的视频内容...' : 'Describe the video content you want to generate...')}
             style={{
               width: '100%',
               height: '100px',
@@ -144,9 +127,9 @@ export default function VideoGenDialog({
               cursor: 'text'
             }}
           />
-          <div style={{ marginTop: '4px', fontSize: '12px', color: (customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)).length > 700 ? '#ff6b6b' : '#999' }}>
-            {(customPrompt || (selectedFrames.length > 0 ? finalPrompt : prompt)).length} / 760
-            {selectedFrames.length > 0 && !customPrompt && <span style={{ marginLeft: '10px', color: '#666' }}>({lang === 'zh' ? '自动生成' : 'Auto-generated'})</span>}
+          <div style={{ marginTop: '4px', fontSize: '12px', color: (customPrompt || prompt).length > 700 ? '#ff6b6b' : '#999' }}>
+            {(customPrompt || prompt).length} / 760
+            {selectedFrames.length > 0 && !customPrompt && <span style={{ marginLeft: '10px', color: '#666' }}>({lang === 'zh' ? '基于分镜图生成' : 'Based on storyboard'})</span>}
           </div>
         </div>
 

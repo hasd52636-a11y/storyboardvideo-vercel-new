@@ -222,7 +222,11 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                           <span>{t.frameCount}</span>
                           <span>{frameCount}</span>
                         </div>
-                        <input type="range" min="1" max="16" value={frameCount} onChange={e => setFrameCount(Number(e.target.value))} className="w-full accent-purple-600 h-1" />
+                        <div className="flex gap-2">
+                          <button onClick={() => setFrameCount(Math.max(1, frameCount - 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>−</button>
+                          <input type="number" min="1" max="16" value={frameCount} onChange={e => setFrameCount(Math.max(1, Math.min(16, Number(e.target.value))))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold border text-center outline-none ${theme === 'dark' ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-50 border-zinc-300 text-black'}`} />
+                          <button onClick={() => setFrameCount(Math.min(16, frameCount + 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>+</button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '风格' : 'Style'}</label>

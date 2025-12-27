@@ -8,7 +8,8 @@ interface APIConfigDialogProps {
 
 const DEFAULT_URLS: Record<VideoAPIProvider, string> = {
   openai: 'https://api.openai.com',
-  dyu: 'https://api.dyuapi.com'
+  dyu: 'https://api.dyuapi.com',
+  shenma: 'https://api.whatai.cc'
 };
 
 const PROVIDER_INFO: Record<VideoAPIProvider, { name: string; color: string; description: string; getKeyUrl: string }> = {
@@ -19,10 +20,16 @@ const PROVIDER_INFO: Record<VideoAPIProvider, { name: string; color: string; des
     getKeyUrl: 'https://platform.openai.com/api-keys'
   },
   dyu: {
-    name: 'DYU API',
+    name: 'DYU API (推荐)',
     color: '#2196F3',
-    description: '功能丰富，支持更多风格',
+    description: '✅ 支持视频生成，功能丰富',
     getKeyUrl: 'https://api.dyuapi.com'
+  },
+  shenma: {
+    name: '神马 API (Seedance)',
+    color: '#FF9800',
+    description: '✅ 图生视频，已测试通过',
+    getKeyUrl: 'https://api.whatai.cc'
   }
 };
 
@@ -143,7 +150,7 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
             📍 第 1 步：选择服务商
           </p>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {(['openai', 'dyu'] as const).map((p) => (
+            {(['openai', 'dyu', 'shenma'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setProvider(p)}
