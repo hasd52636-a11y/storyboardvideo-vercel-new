@@ -65,6 +65,9 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     currentIndex: 0,
   });
 
+  // 标记是否是来自截图分析的请求
+  const [isScreenshotAnalysis, setIsScreenshotAnalysis] = useState(false);
+
   const screenshotServiceRef = useRef<ScreenshotCaptureService | null>(null);
 
   const t = I18N[lang];
@@ -230,6 +233,9 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
               currentIndex: prev.files.length,
             }));
             
+            // 标记为截图分析请求
+            setIsScreenshotAnalysis(true);
+            
             // 自动发送分析请求 - 使用预设提示词
             const analysisPrompt = lang === 'zh' 
               ? '请详细分析这张截图中的内容，包括主体、构图、色彩、光线、风格等，并生成一个可用于图像生成的详细提示词。'
@@ -263,6 +269,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     console.log('[handleSendChat] Starting chat send');
     console.log('[handleSendChat] Text:', text.substring(0, 50));
     console.log('[handleSendChat] Attached images:', attachedImage.previews.length);
+    console.log('[handleSendChat] Is screenshot analysis:', isScreenshotAnalysis);
     
     // Create user message with optional images
     const userMessage: ChatMessage = { 
@@ -318,10 +325,29 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       console.log('[handleSendChat] Got response:', resp?.substring(0, 50));
       const aiResponse = resp || (lang === 'zh' ? '抱歉，无法获取回复。请检查API配置。' : 'Sorry, unable to get response. Please check API configuration.');
       setChatHistory([...history, { role: 'model', text: aiResponse } as ChatMessage]);
+      
+      // 如果是截图分析请求，收到回复后自动生图
+      if (isScreenshotAnalysis && aiResponse && !aiResponse.includes('抱歉') && !aiResponse.includes('Sorry')) {
+        console.log('[handleSendChat] Auto-generating image from screenshot analysis');
+        setIsScreenshotAnalysis(false);
+        
+        // 延迟一下确保聊天历史已更新
+        setTimeout(() => {
+          // 使用 AI 返回的描述作为提示词，用户选择的画面比例生图
+          onGenerateFromScript(
+            aiResponse,
+            1, // 生成 1 张图
+            scriptStyle || undefined,
+            chatAspectRatio || undefined, // 使用聊天模式选择的画面比例
+            scriptDuration || undefined
+          );
+        }, 500);
+      }
     } catch (e) {
       console.error('[handleSendChat] Chat error:', e);
       const errorMsg = lang === 'zh' ? '发生错误，请重试。' : 'An error occurred, please try again.';
       setChatHistory([...history, { role: 'model', text: errorMsg } as ChatMessage]);
+      setIsScreenshotAnalysis(false);
     } finally { 
       console.log('[handleSendChat] Chat send completed');
       setIsChatLoading(false); 
