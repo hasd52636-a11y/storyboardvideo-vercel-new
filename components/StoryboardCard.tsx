@@ -23,6 +23,7 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [showEditPrompt, setShowEditPrompt] = useState(false);
   const [editPrompt, setEditPrompt] = useState(item.prompt);
+  const [showQuickStoryboardSubmenu, setShowQuickStoryboardSubmenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = I18N[lang];
 
@@ -93,14 +94,13 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
         {!item.isMain && (
           <div className="absolute inset-0 pointer-events-none">
             {item.symbols.map(s => <div key={s.id} className="absolute text-purple-500 font-black text-3xl drop-shadow-md" style={{ left: `${s.x}%`, top: `${s.y}%`, transform: 'translate(-50%, -50%)' }}>{s.label}</div>)}
-            <div className="absolute top-4 left-4 bg-black/50 backdrop-blur px-2 py-1 rounded text-[10px] font-black text-white">SCENE {String(item.order + 1).padStart(2, '0')}</div>
           </div>
         )}
         {/* Resize handle removed to prevent interference with file upload */}
       </div>
 
       {showMenu && (
-        <div className="fixed inset-0 z-[200]" onClick={() => setShowMenu(false)}>
+        <div className="fixed inset-0 z-[200]" onClick={() => { setShowMenu(false); setShowQuickStoryboardSubmenu(false); }}>
           <div 
             className={`p-2 border rounded-2xl shadow-2xl w-40 flex flex-col font-black text-[10px] uppercase tracking-widest ${theme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-600 shadow-zinc-300/50'}`} 
             style={{
@@ -116,10 +116,25 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
             ) : (
               !item.isMain && <button onClick={() => { setEditPrompt(item.prompt); setShowEditPrompt(true); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.redrawViewScript}</button>
             )}
-            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'three-view'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '三视图' : 'Three-View'}</button>}
-            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'multi-grid'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多角度' : 'Multi-Grid'}</button>}
-            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'style-comparison'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多风格' : 'Style Comparison'}</button>}
-            {!item.isMain && <button onClick={() => { onQuickAction?.(item.id, 'narrative-progression'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '叙事进展' : 'Narrative Progression'}</button>}
+            {false && !item.isMain && (
+              <div className="relative" onMouseEnter={() => setShowQuickStoryboardSubmenu(true)} onMouseLeave={() => setShowQuickStoryboardSubmenu(false)}>
+                <button 
+                  onClick={() => setShowQuickStoryboardSubmenu(!showQuickStoryboardSubmenu)}
+                  className="w-full p-3 text-left hover:text-blue-500 transition-all flex items-center justify-between"
+                >
+                  {lang === 'zh' ? '快捷分镜' : 'Quick Storyboard'}
+                  <span className="text-xs">▶</span>
+                </button>
+                {showQuickStoryboardSubmenu && (
+                  <div className={`absolute left-full top-0 ml-1 border rounded-xl shadow-2xl w-40 flex flex-col font-black text-[10px] uppercase tracking-widest z-[9999] pointer-events-auto ${theme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-600'}`}>
+                    <button onClick={() => { onQuickAction?.(item.id, 'three-view'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '三视图' : 'Three-View'}</button>
+                    <button onClick={() => { onQuickAction?.(item.id, 'multi-grid'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多角度' : 'Multi-Grid'}</button>
+                    <button onClick={() => { onQuickAction?.(item.id, 'style-comparison'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多风格' : 'Style Comparison'}</button>
+                    <button onClick={() => { onQuickAction?.(item.id, 'narrative-progression'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '叙事进展' : 'Narrative Progression'}</button>
+                  </div>
+                )}
+              </div>
+            )}
             <button onClick={() => { onAction(item.id, 'copy'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{t.copy}</button>
             {onExportJPEG && <button onClick={() => { onExportJPEG(); setShowMenu(false); }} className="p-3 text-left hover:text-green-500 transition-all">{t.downloadImage}</button>}
             {!item.isMain && onGenerateVideo && <button onClick={() => { onGenerateVideo(); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">🎬 {lang === 'zh' ? '生成视频' : 'Generate Video'}</button>}

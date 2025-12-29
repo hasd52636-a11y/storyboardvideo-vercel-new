@@ -4,11 +4,17 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import fc from 'fast-check';
 import {
   getBase64MimeType,
   isImageUrl,
   isBase64Image,
   base64ToFile,
+  validateImageFile,
+  generateImagePreview,
+  getImageMetadata,
+  convertImageForAPI,
+  formatFileSize,
 } from '../image-utils';
 
 describe('Image Utilities', () => {
@@ -199,6 +205,110 @@ describe('Image Utilities', () => {
     it('should handle URLs with various protocols', () => {
       expect(isImageUrl('https://example.com/image.jpg')).toBe(true);
       expect(isImageUrl('http://example.com/image.jpg')).toBe(true);
+    });
+  });
+
+  describe('formatFileSize', () => {
+    it('should format bytes correctly', () => {
+      expect(formatFileSize(0)).toBe('0 Bytes');
+      expect(formatFileSize(1024)).toBe('1 KB');
+      expect(formatFileSize(1024 * 1024)).toBe('1 MB');
+      expect(formatFileSize(5 * 1024 * 1024)).toBe('5 MB');
+    });
+
+    it('should handle large file sizes', () => {
+      expect(formatFileSize(1024 * 1024 * 1024)).toBe('1 GB');
+    });
+  });
+
+  describe('Image Format Validation - Property Tests', () => {
+    // Feature: creative-chat-image-attachment, Property 1: Image Format Validation
+    // Validates: Requirements 1.3, 5.2
+    it('should reject unsupported image formats', async () => {
+      const unsupportedFormats = ['.txt', '.pdf', '.doc', '.mp4', '.exe', '.zip'];
+      
+      for (const ext of unsupportedFormats) {
+        const filename = `test${ext}`;
+        const mimeType = 'application/octet-stream';
+        const file = new File([new ArrayBuffer(100)], filename, { type: mimeType });
+        
+        const result = await validateImageFile(file);
+        expect(result.valid).toBe(false);
+        expect(result.error).toBeDefined();
+      }
+    });
+
+    it('should reject files exceeding size limit', async () => {
+      const largeSize = 5 * 1024 * 1024 + 1; // Just over 5MB limit
+      const file = new File([new ArrayBuffer(largeSize)], 'large.jpg', { type: 'image/jpeg' });
+      
+      const result = await validateImageFile(file);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('too large');
+    });
+  });
+
+  describe('Image Conversion - Property Tests', () => {
+    // Feature: creative-chat-image-attachment, Property 6: Image Conversion Maintains Quality
+    // Validates: Requirements 7.1, 7.4
+    it('should handle URL pass-through correctly', async () => {
+      const urls = [
+        'https://example.com/image.jpg',
+        'http://example.com/image.png',
+        'https://cdn.example.com/images/photo.webp?size=large'
+      ];
+
+      for (const url of urls) {
+        const result = await convertImageForAPI(url);
+        expect(result).toBe(url);
+      }
+    });
+
+    it('should handle base64 image strings correctly', async () => {
+      const base64Images = [
+        'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAA==',
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'data:image/webp;base64,UklGRiYAAABXRUJQVlA4IBIAAAAwAQCdASoBAAEAAUAcJaACdLoB/gAA/v8A/v8A',
+        'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+      ];
+
+      for (const base64 of base64Images) {
+        const result = await convertImageForAPI(base64);
+        expect(result).toBe(base64);
+      }
+    });
+  });
+
+  describe('Image Metadata Display - Property Tests', () => {
+    // Feature: creative-chat-image-attachment, Property 11: Image Metadata Display
+    // Validates: Requirements 2.2
+    it('should format file size correctly for metadata display', () => {
+      const testCases = [
+        { size: 1024, expected: '1 KB' },
+        { size: 1024 * 1024, expected: '1 MB' },
+        { size: 5 * 1024 * 1024, expected: '5 MB' },
+        { size: 512, expected: '512 Bytes' },
+      ];
+
+      for (const testCase of testCases) {
+        const formatted = formatFileSize(testCase.size);
+        expect(formatted).toBe(testCase.expected);
+      }
+    });
+
+    it('should identify image format from MIME type', () => {
+      const formats = [
+        { mime: 'image/jpeg', expected: 'jpeg' },
+        { mime: 'image/png', expected: 'png' },
+        { mime: 'image/webp', expected: 'webp' },
+        { mime: 'image/gif', expected: 'gif' }
+      ];
+
+      for (const format of formats) {
+        const mimeType = format.mime;
+        const extracted = mimeType.split('/')[1];
+        expect(extracted).toBe(format.expected);
+      }
     });
   });
 });

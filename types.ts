@@ -81,6 +81,24 @@ export interface ScriptScene {
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+  images?: string[]; // base64 or URLs
+}
+
+export interface ImageAttachmentState {
+  file: File | null;
+  preview: string; // base64 or URL
+  dimensions: { width: number; height: number } | null;
+  fileSize: number; // in bytes
+  isLoading: boolean;
+  error: string | null;
+}
+
+export interface ImageMetadata {
+  width: number;
+  height: number;
+  size: number; // bytes
+  format: string; // 'jpeg', 'png', 'webp', 'gif'
+  uploadedAt?: Date;
 }
 
 export type Language = 'zh' | 'en';

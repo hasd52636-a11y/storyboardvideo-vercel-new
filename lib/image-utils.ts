@@ -358,3 +358,63 @@ export function isBase64Image(str: string): boolean {
   return str.startsWith('data:image/') && str.includes(';base64,');
 }
 
+/**
+ * Generate image preview (thumbnail)
+ * Returns base64 data URL for preview display
+ */
+export async function generateImagePreview(file: File): Promise<string> {
+  return fileToBase64(file);
+}
+
+/**
+ * Get image metadata
+ * Returns dimensions and file size
+ */
+export async function getImageMetadata(file: File): Promise<{
+  width: number;
+  height: number;
+  size: number;
+  format: string;
+}> {
+  const dimensions = await getImageDimensions(file);
+  const format = file.type.split('/')[1] || 'unknown';
+  
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    size: file.size,
+    format,
+  };
+}
+
+/**
+ * Convert image for API (to base64 or keep URL)
+ * If image is already a URL, return it as-is
+ * If image is a File or base64, convert to base64
+ */
+export async function convertImageForAPI(imageInput: File | string): Promise<string> {
+  // If it's already a URL, return as-is
+  if (typeof imageInput === 'string' && isImageUrl(imageInput)) {
+    return imageInput;
+  }
+
+  // If it's a File, convert to base64
+  if (imageInput instanceof File) {
+    return fileToBase64(imageInput);
+  }
+
+  // If it's already base64, return as-is
+  if (typeof imageInput === 'string' && isBase64Image(imageInput)) {
+    return imageInput;
+  }
+
+  throw new Error('Invalid image input: must be a File, URL, or base64 string');
+}
+
+/**
+ * Format file size for display
+ */
+export function formatFileSize(bytes: number): string {
+  return formatBytes(bytes);
+}
+

@@ -156,17 +156,17 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
       }
 
       if (type === 'three-view') {
-        // Generate three orthographic views
+        // Generate three orthographic views using system prompts only
         const threeViewPrompts = [
-          `Professional cinematic storyboard frame - Front orthographic view. Show a detailed subject from the front with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
-          `Professional cinematic storyboard frame - Side orthographic view. Show a detailed subject from the side with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
-          `Professional cinematic storyboard frame - Top orthographic view. Show a detailed subject from above with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`
+          `Generate a professional cinematic storyboard frame showing a subject from a front orthographic view. Show a detailed subject from the front with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+          `Generate a professional cinematic storyboard frame showing a subject from a side orthographic view. Show a detailed subject from the side with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`,
+          `Generate a professional cinematic storyboard frame showing a subject from a top orthographic view. Show a detailed subject from above with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`
         ];
 
         for (let i = 0; i < 3; i++) {
           try {
             console.log(`[Quick Storyboard] Generating view ${i + 1}/3...`);
-            const imageUrl = await generateSceneImage(threeViewPrompts[i], true, false, undefined, undefined);
+            const imageUrl = await generateSceneImage(threeViewPrompts[i], true, false, undefined, undefined, referenceImage);
             if (imageUrl) {
               console.log(`[Quick Storyboard] ✓ View ${i + 1} generated successfully`);
               images.push(imageUrl);
@@ -178,13 +178,13 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
           }
         }
       } else if (type === 'multi-grid') {
-        // Generate multi-grid storyboard
+        // Generate multi-grid storyboard using system prompts only
         const frameCount = parseInt(parameters.frameCount || '4');
-        const prompt = `Professional cinematic storyboard - ${frameCount}-frame grid showing a narrative sequence. Each frame shows progression of a dramatic scene with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+        const prompt = `Generate a professional cinematic storyboard showing a ${frameCount}-frame grid. Each frame shows different camera angles or positions of a subject, showing progression of a dramatic scene. Each frame shows progression with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
         
         try {
           console.log(`[Quick Storyboard] Generating multi-grid with ${frameCount} frames...`);
-          const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+          const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined, referenceImage);
           if (imageUrl) {
             console.log(`[Quick Storyboard] ✓ Multi-grid generated successfully`);
             images.push(imageUrl);
@@ -195,15 +195,15 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
           console.error('[Quick Storyboard] Failed to generate multi-grid:', err);
         }
       } else if (type === 'style-comparison') {
-        // Generate 5 different artistic styles
+        // Generate 5 different artistic styles using system prompts only
         const styles = ['oil painting', 'watercolor', 'digital art', 'anime', 'photorealistic'];
         
         for (let idx = 0; idx < styles.length; idx++) {
           const style = styles[idx];
           try {
             console.log(`[Quick Storyboard] Generating ${style} style (${idx + 1}/${styles.length})...`);
-            const prompt = `Professional cinematic storyboard frame in ${style} artistic style. Show a detailed subject with clear composition, professional lighting, and rich details. High quality artwork. Aspect ratio: 16:9`;
-            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+            const prompt = `Generate a professional cinematic storyboard frame showing a subject in ${style} artistic style. Show a detailed subject with clear composition, professional lighting, and rich details. High quality artwork. Aspect ratio: 16:9`;
+            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined, referenceImage);
             if (imageUrl) {
               console.log(`[Quick Storyboard] ✓ ${style} style generated successfully`);
               images.push(imageUrl);
@@ -215,14 +215,14 @@ export const StoryboardApp: React.FC<{ userId: number }> = ({ userId }) => {
           }
         }
       } else if (type === 'narrative-progression') {
-        // Generate sequential narrative frames
+        // Generate sequential narrative frames using system prompts only
         const frameCount = parseInt(parameters.frameCount || '4');
         
         for (let i = 0; i < frameCount; i++) {
           try {
             console.log(`[Quick Storyboard] Generating frame ${i + 1}/${frameCount}...`);
-            const prompt = `Professional cinematic storyboard frame ${i + 1} of ${frameCount}. Show a dramatic scene with clear composition, professional lighting, and rich details. Part of a narrative sequence showing story progression. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
-            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined);
+            const prompt = `Generate a professional cinematic storyboard frame ${i + 1} of ${frameCount}. Show a subject in a dramatic scene. Part of a narrative sequence showing story progression. Show a dramatic scene with clear composition, professional lighting, and rich details. High quality digital painting with vibrant colors. Aspect ratio: 16:9`;
+            const imageUrl = await generateSceneImage(prompt, true, false, undefined, undefined, referenceImage);
             if (imageUrl) {
               console.log(`[Quick Storyboard] ✓ Frame ${i + 1} generated successfully`);
               images.push(imageUrl);

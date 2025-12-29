@@ -395,59 +395,69 @@ export const generateSceneImage = async (prompt: string, _forceLineArt: boolean 
         }
       }
       
-      // 文生图 (generations) 端点
+      // 文生图 (generations) 端点 - 默认使用 gpt-image-1，失败则自动降级到 nano-banana
       const endpoint = `${config.baseUrl}/v1/images/generations`;
       console.log('[generateSceneImage] Calling generations endpoint:', endpoint);
       
       const fullPrompt = `${stylePrefix} ${prompt}`;
-      const requestBody = {
-        model: config?.imageModel || 'nano-banana',
-        prompt: fullPrompt,
-        aspect_ratio: aspectRatio || '16:9',
-        response_format: 'url'
-      };
       
-      console.log('[generateSceneImage] Request body:');
-      console.log('  - model:', requestBody.model);
-      console.log('  - prompt:', fullPrompt.substring(0, 150) + '...');
-      console.log('  - aspect_ratio:', requestBody.aspect_ratio);
-      console.log('  - response_format:', requestBody.response_format);
-      console.log('[generateSceneImage] Full request body JSON:', JSON.stringify(requestBody, null, 2));
-      console.log('[generateSceneImage] Authorization header: Bearer ' + apiKey.substring(0, 10) + '...');
+      // 模型列表：gpt-image-1 为主，nano-banana 为备份
+      const models = ['gpt-image-1', 'nano-banana'];
+      let response: Response | null = null;
+      let lastError: string = '';
+      let usedModel: string = '';
       
-      let response;
-      try {
-        response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          mode: 'cors',
-          credentials: 'omit',
-          body: JSON.stringify(requestBody)
-        });
-      } catch (fetchError) {
-        console.error('[generateSceneImage] ❌ Fetch error (network/CORS issue):', fetchError);
-        console.error('[generateSceneImage] This might be a CORS issue. The API server may not be accepting requests from this domain.');
-        return null;
-      }
-
-      console.log('[generateSceneImage] API response status:', response.status);
-      console.log('[generateSceneImage] API response headers:', {
-        'content-type': response.headers.get('content-type'),
-        'access-control-allow-origin': response.headers.get('access-control-allow-origin')
-      });
-      
-      if (!response.ok) {
-        let errorText = '';
+      for (const model of models) {
+        const requestBody = {
+          model: model,
+          prompt: fullPrompt,
+          aspect_ratio: aspectRatio || '16:9',
+          response_format: 'url'
+        };
+        
+        console.log(`[generateSceneImage] Attempting image generation with model: ${model}`);
+        
         try {
-          errorText = await response.text();
-        } catch (e) {
-          errorText = 'Could not read error response';
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            mode: 'cors',
+            credentials: 'omit',
+            body: JSON.stringify(requestBody)
+          });
+          
+          console.log(`[generateSceneImage] ${model} response status: ${response.status}`);
+          
+          if (response.ok) {
+            usedModel = model;
+            console.log(`[generateSceneImage] ✓ Image generation successful with ${model}`);
+            break;
+          } else {
+            const errorText = await response.text();
+            lastError = `${model} (${response.status}): ${errorText.substring(0, 150)}`;
+            console.warn(`[generateSceneImage] ${model} failed - ${lastError}`);
+            
+            // 如果是主模型失败，尝试备份
+            if (model === 'gpt-image-1') {
+              console.log('[generateSceneImage] gpt-image-1 failed, attempting fallback to nano-banana...');
+            }
+          }
+        } catch (fetchError) {
+          lastError = `${model} error: ${String(fetchError).substring(0, 100)}`;
+          console.warn(`[generateSceneImage] ${model} fetch error:`, fetchError);
+          
+          if (model === 'gpt-image-1') {
+            console.log('[generateSceneImage] gpt-image-1 error, attempting fallback to nano-banana...');
+          }
         }
-        console.error(`[generateSceneImage] ❌ Image generation failed: ${response.status}`);
-        console.error('[generateSceneImage] Error response:', errorText);
+      }
+      
+      if (!response || !response.ok) {
+        console.error('[generateSceneImage] ❌ Image generation failed with all models');
+        console.error('[generateSceneImage] Last error:', lastError);
         console.error('[generateSceneImage] Full response:', response);
         return null;
       }
@@ -463,6 +473,7 @@ export const generateSceneImage = async (prompt: string, _forceLineArt: boolean 
       }
       
       console.log('[generateSceneImage] ✓ API response received');
+      console.log(`[generateSceneImage] Used model: ${usedModel}`);
       console.log('[generateSceneImage] Response data:', JSON.stringify(data, null, 2));
       const imageUrl = data.data?.[0]?.url;
       
@@ -608,13 +619,48 @@ export const chatWithGemini = async (messages: any[]) => {
   if (config && config.provider !== 'gemini' && config.apiKey) {
     try {
       const formattedMessages = messages.map(m => {
-        // 安全提取文本内容
+        // 安全提取文本内容和图片
         let text = '';
+        let images: string[] = [];
+        
         if (typeof m.text === 'string') {
           text = m.text;
         } else if (m.parts && Array.isArray(m.parts) && m.parts[0]?.text) {
           text = m.parts[0].text;
         }
+        
+        // 提取图片
+        if (m.images && Array.isArray(m.images)) {
+          images = m.images;
+        }
+        
+        // 如果有图片，使用 content 数组格式（gpt-4o 支持）
+        if (images.length > 0) {
+          const content: any[] = [
+            {
+              type: 'text',
+              text: text
+            }
+          ];
+          
+          // 添加图片到 content 数组
+          images.forEach(imageUrl => {
+            content.push({
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+                detail: 'auto'
+              }
+            });
+          });
+          
+          return {
+            role: m.role === 'model' ? 'assistant' : 'user',
+            content: content
+          };
+        }
+        
+        // 没有图片时使用简单文本格式
         return {
           role: m.role === 'model' ? 'assistant' : 'user',
           content: text
@@ -657,16 +703,50 @@ export const chatWithGemini = async (messages: any[]) => {
         parts: [{ text: "I understand. I'll provide expert storyboarding and film direction advice." }]
       },
       ...messages.map(m => {
-        // 安全提取文本内容
+        // 安全提取文本内容和图片
         let text = '';
+        let images: string[] = [];
+        
         if (typeof m.text === 'string') {
           text = m.text;
         } else if (m.parts && Array.isArray(m.parts) && m.parts[0]?.text) {
           text = m.parts[0].text;
         }
+        
+        // 提取图片
+        if (m.images && Array.isArray(m.images)) {
+          images = m.images;
+        }
+        
+        // 构建 parts 数组
+        const parts: any[] = [{ text }];
+        
+        // 添加图片到 parts 数组
+        images.forEach(imageUrl => {
+          if (imageUrl.startsWith('data:')) {
+            // Base64 格式
+            const base64Data = imageUrl.split(',')[1];
+            const mimeType = imageUrl.split(';')[0].replace('data:', '');
+            parts.push({
+              inlineData: {
+                mimeType: mimeType || 'image/png',
+                data: base64Data
+              }
+            });
+          } else if (imageUrl.startsWith('http')) {
+            // URL 格式
+            parts.push({
+              fileData: {
+                mimeType: 'image/png',
+                fileUri: imageUrl
+              }
+            });
+          }
+        });
+        
         return {
           role: m.role === 'model' ? 'model' : 'user',
-          parts: [{ text }]
+          parts: parts
         };
       })
     ];

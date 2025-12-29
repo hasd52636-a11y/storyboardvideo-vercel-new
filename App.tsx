@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { StoryboardItem, FilterMode, ToolType, Language, I18N, ModelProvider, Theme, StoryboardSymbol, ExportLayout, SYMBOL_DESCRIPTIONS, SYMBOL_LABELS, StyleOption, AspectRatio, VideoItem } from './types';
 import { generateSceneImage, parseScriptToScenes, generateStoryboardFromDialogue } from './geminiService';
@@ -2024,8 +2024,8 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
             <span className="text-white font-black text-3xl">L</span>
           </div>
           <div className="flex flex-col">
-            <span className={`text-lg font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{lang === 'zh' ? '????' : 'Storyboard Master'}</span>
-            <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">{lang === 'zh' ? 'Storyboard Master' : '????'}</span>
+            <span className={`text-lg font-black tracking-tight ${theme === 'dark' ? 'text-white' : 'text-zinc-900'}`}>{lang === 'zh' ? '分镜大师' : 'Storyboard Master'}</span>
+            <span className="text-xs font-bold text-purple-500 uppercase tracking-widest">{lang === 'zh' ? 'AI 智能分镜创作平台' : 'AI-Powered Storyboarding'}</span>
           </div>
         </div>
         
@@ -2167,6 +2167,7 @@ This is frame ${i} showing the progression of the narrative. Each frame should a
 };
 
 export default App;
+
 
 
 
