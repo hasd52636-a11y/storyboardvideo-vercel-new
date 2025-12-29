@@ -66,7 +66,6 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
   });
 
   const screenshotServiceRef = useRef<ScreenshotCaptureService | null>(null);
-  const [isScreenshotMode, setIsScreenshotMode] = useState(false);
 
   const t = I18N[lang];
   const models: ModelProvider[] = ['banana', 'gemini', 'openai', 'veo'];
@@ -182,49 +181,34 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     }
   };
 
-  // 截图处理函数
+  // 截图处理函数 - 直接使用 html2canvas 截图
   const handleScreenshot = async () => {
     try {
-      setIsScreenshotMode(true);
       setAttachedImage(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // 初始化截图服务
-      if (!screenshotServiceRef.current) {
-        screenshotServiceRef.current = new ScreenshotCaptureService();
-      }
+      // 动态导入 html2canvas
+      const html2canvas = (await import('html2canvas')).default;
       
-      const service = screenshotServiceRef.current;
-      
-      // 启动截图模式
-      await service.startScreenshotMode();
-      
-      // 等待用户按 Print Screen
-      const screenshotBlob = await new Promise<Blob | null>((resolve) => {
-        const handleScreenshotCaptured = (event: any) => {
-          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
-          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
-          resolve(event.detail?.blob || null);
-        };
-        
-        const handleScreenshotError = (event: any) => {
-          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
-          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
-          resolve(null);
-        };
-        
-        window.addEventListener('screenshotCaptured', handleScreenshotCaptured);
-        window.addEventListener('screenshotCaptureError', handleScreenshotError);
-        
-        // 30秒超时
-        setTimeout(() => {
-          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
-          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
-          resolve(null);
-        }, 30000);
+      // 截图整个页面
+      const canvas = await html2canvas(document.body, {
+        allowTaint: true,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        scale: window.devicePixelRatio,
       });
       
-      if (screenshotBlob) {
-        // 将截图转换为 base64
+      // 转换为 blob
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          setAttachedImage(prev => ({
+            ...prev,
+            isLoading: false,
+            error: lang === 'zh' ? '截图转换失败' : 'Screenshot conversion failed',
+          }));
+          return;
+        }
+        
+        // 转换为 base64
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = reader.result as string;
@@ -233,12 +217,12 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
           const img = new Image();
           img.onload = () => {
             // 将 Blob 转换为 File
-            const file = new File([screenshotBlob], `screenshot-${Date.now()}.png`, { type: 'image/png' });
+            const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' });
             setAttachedImage(prev => ({
               files: [...prev.files, file],
               previews: [...prev.previews, base64],
               dimensions: [...prev.dimensions, { width: img.width, height: img.height }],
-              fileSizes: [...prev.fileSizes, screenshotBlob.size],
+              fileSizes: [...prev.fileSizes, blob.size],
               isLoading: false,
               error: null,
               currentIndex: prev.files.length,
@@ -246,14 +230,8 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
           };
           img.src = base64;
         };
-        reader.readAsDataURL(screenshotBlob);
-      } else {
-        setAttachedImage(prev => ({
-          ...prev,
-          isLoading: false,
-          error: lang === 'zh' ? '截图失败或被取消' : 'Screenshot failed or was cancelled',
-        }));
-      }
+        reader.readAsDataURL(blob);
+      }, 'image/png');
     } catch (error) {
       console.error('[handleScreenshot] Error:', error);
       setAttachedImage(prev => ({
@@ -261,8 +239,6 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
         isLoading: false,
         error: lang === 'zh' ? '截图出错' : 'Screenshot error',
       }));
-    } finally {
-      setIsScreenshotMode(false);
     }
   };
 
@@ -759,15 +735,15 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                         {/* 截图按钮 */}
                         <button 
                           onClick={handleScreenshot}
-                          disabled={isChatLoading || isScreenshotMode}
-                          title={lang === 'zh' ? '截图 (按 Print Screen)' : 'Screenshot (Press Print Screen)'}
+                          disabled={isChatLoading || attachedImage.isLoading}
+                          title={lang === 'zh' ? '截图当前页面' : 'Screenshot current page'}
                           className={`w-6 h-6 flex items-center justify-center text-lg transition-all hover:scale-110 ${
-                            isScreenshotMode
+                            attachedImage.isLoading
                               ? 'text-orange-500 animate-pulse'
                               : theme === 'dark'
                               ? 'text-gray-400 hover:text-gray-300'
                               : 'text-gray-600 hover:text-gray-700'
-                          } ${(isChatLoading || isScreenshotMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${(isChatLoading || attachedImage.isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           📸
                         </button>

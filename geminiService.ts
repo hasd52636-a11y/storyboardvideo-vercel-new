@@ -1,4 +1,4 @@
-
+﻿
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScriptScene, ProviderConfig } from "./types";
 
@@ -15,14 +15,17 @@ const adjustSceneCount = (scenes: any[], targetCount: number): ScriptScene[] => 
   }
 
   if (scenes.length < targetCount) {
-    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Padding with duplicates.`);
+    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Padding with new scenes.`);
     const padded = [...scenes];
+    
+    // 不要简单复制，而是生成新的场景
     while (padded.length < targetCount) {
       const lastScene = padded[padded.length - 1];
+      // 生成新的场景而不是复制
       padded.push({
         index: padded.length,
-        description: lastScene.description + ` (variation ${padded.length - targetCount + 1})`,
-        visualPrompt: lastScene.visualPrompt + ` (variation ${padded.length - targetCount + 1})`
+        description: `Scene ${padded.length + 1}: Continuation of the story`,
+        visualPrompt: `Continuation scene showing the next moment in the narrative. Visual style consistent with previous scenes.`
       });
     }
     return padded;
@@ -70,7 +73,7 @@ export const testApiConnection = async (config: ProviderConfig, type: 'llm' | 'i
       // 所有API都需要model参数
       const body = type === 'image'
         ? { 
-            model: config.imageModel || 'nano-banana',
+            model: 'gpt-image-1',  // 默认使用 gpt-image-1
             prompt: 'test',
             response_format: 'url'
           }
@@ -334,7 +337,7 @@ export const generateSceneImage = async (prompt: string, _forceLineArt: boolean 
             try {
               const fullPrompt = `${stylePrefix} ${prompt}`;
               const formData = new FormData();
-              formData.append('model', config?.imageModel || 'nano-banana');
+              formData.append('model', 'gpt-image-1');  // 使用 gpt-image-1 作为默认
               formData.append('prompt', fullPrompt);
               formData.append('image', imageBlob, 'reference.png');
               formData.append('aspect_ratio', aspectRatio || '16:9');
@@ -342,7 +345,7 @@ export const generateSceneImage = async (prompt: string, _forceLineArt: boolean 
               
               console.log('[generateSceneImage] Calling edits endpoint:', editsEndpoint);
               console.log('[generateSceneImage] FormData fields:');
-              console.log('  - model:', config?.imageModel || 'nano-banana');
+              console.log('  - model: gpt-image-1');
               console.log('  - prompt:', fullPrompt.substring(0, 100) + '...');
               console.log('  - image blob size:', imageBlob.size, 'bytes');
               console.log('  - aspect_ratio:', aspectRatio || '16:9');
@@ -526,9 +529,46 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
           messages: [
             { 
               role: 'system', 
-              content: `You are a script parser. Parse input into exactly ${sceneCount} storyboard scenes. Return ONLY a valid JSON array of objects with keys: index (int), description (string), visualPrompt (string). Do not include markdown code blocks or any other text.` 
+              content: `You are a professional storyboard script parser. Your task is to parse a script into exactly ${sceneCount} distinct storyboard scenes with STRICT VISUAL CONSISTENCY.
+
+CRITICAL RULES FOR SCENE SEPARATION:
+1. IDENTIFY NATURAL BREAKS: Look for paragraph breaks, scene transitions, location changes, or time jumps
+2. ONE SCENE PER PARAGRAPH/MOMENT: Each distinct moment, location, or action should be a separate scene
+3. SEQUENTIAL FLOW: Scenes should follow the narrative order exactly
+4. UNIQUE CONTENT: Each scene must have different content - NO duplicates or repetitions
+5. COMPLETE COVERAGE: All important story beats must be included
+
+VISUAL CONSISTENCY REQUIREMENTS (CRITICAL):
+- CHARACTER CONSISTENCY: All characters must maintain identical appearance, clothing, hairstyle, and physical characteristics across ALL scenes
+- STYLE CONSISTENCY: Maintain the same visual style, color palette, lighting, and artistic direction throughout
+- ENVIRONMENT CONTINUITY: Locations should be visually connected and logically flow from one scene to the next
+- SEAMLESS TRANSITIONS: Each scene should naturally lead to the next with clear visual connections
+- PROPS & DETAILS: Keep consistent props, objects, and environmental details that appear in multiple scenes
+- NO QUESTION MARKS: Use clear, descriptive language. Never use "?" or uncertain descriptions
+
+SCENE STRUCTURE:
+- Each scene focuses on ONE main action, location, or moment
+- Scenes should be distinct and non-overlapping
+- Maintain narrative continuity between scenes
+- Include specific character descriptions and positioning for consistency
+
+RESPONSE FORMAT:
+Return ONLY a valid JSON array with exactly ${sceneCount} objects. Each object must have:
+- index: integer (0-based, starting from 0)
+- description: string (brief scene description, 1-2 sentences, unique for each scene, NO question marks, include character names and key visual elements)
+- visualPrompt: string (detailed visual prompt for image generation with EXPLICIT consistency instructions. Must include: character descriptions with specific details, exact clothing/appearance, environment details, lighting/mood, camera angle, and explicit instruction to maintain consistency with previous scenes. 3-4 sentences minimum. NO question marks, NO uncertain language)
+
+CONSISTENCY INSTRUCTIONS IN VISUAL PROMPTS:
+- Always specify exact character appearance: "Character X wears [specific clothing], has [specific hair], [specific features]"
+- Always reference visual continuity: "Maintain the same visual style and color palette as previous scenes"
+- Always specify environment consistency: "Same location as before with [specific details]"
+- Always include transition guidance: "Seamless visual transition from previous scene"
+
+IMPORTANT: 
+- Be specific and descriptive, never vague
+- Do not include markdown code blocks or any other text. Return ONLY the JSON array.` 
             },
-            { role: 'user', content: scriptText }
+            { role: 'user', content: `Parse this script into exactly ${sceneCount} distinct scenes. CRITICAL: Maintain strict visual consistency across all scenes - same characters with identical appearance, same visual style, seamless transitions, and connected environments. Each scene should be completely different in action/content but visually consistent in style and characters:\n\n${scriptText}` }
           ],
           response_format: { type: "json_object" }
         })
@@ -573,6 +613,28 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
         return [];
       }
       
+      // Clean up scenes: remove question marks and uncertain language
+      scenes = scenes.map((scene: any) => ({
+        ...scene,
+        description: (scene.description || '')
+          .replace(/\?+/g, '.')  // Replace question marks with periods
+          .replace(/\s+\?/g, '.')  // Replace spaces before question marks
+          .replace(/might|could|perhaps|maybe|possibly|seems|appears|looks like/gi, 'is')  // Replace uncertain language
+          .trim(),
+        visualPrompt: (scene.visualPrompt || '')
+          .replace(/\?+/g, '.')  // Replace question marks with periods
+          .replace(/\s+\?/g, '.')  // Replace spaces before question marks
+          .replace(/might|could|perhaps|maybe|possibly|seems|appears|looks like/gi, 'is')  // Replace uncertain language
+          .trim()
+      }));
+      
+      // Validate that scenes are unique
+      const descriptions = scenes.map(s => s.description);
+      const uniqueDescriptions = new Set(descriptions);
+      if (uniqueDescriptions.size < descriptions.length) {
+        console.warn('[parseScriptToScenes] Warning: Some scenes have duplicate descriptions');
+      }
+      
       return adjustSceneCount(scenes, sceneCount);
     } catch (e) {
       console.error("Third-party script parsing failed", e);
@@ -584,8 +646,35 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
   const ai = new GoogleGenAI({ apiKey: apiKey || '' });
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Parse this script into exactly ${sceneCount} storyboard scenes. 
-    Script: ${scriptText}`,
+    contents: `Parse this script into exactly ${sceneCount} storyboard scenes with STRICT VISUAL CONSISTENCY.
+
+CRITICAL RULES FOR SCENE SEPARATION:
+1. IDENTIFY NATURAL BREAKS: Look for paragraph breaks, scene transitions, location changes, or time jumps
+2. ONE SCENE PER PARAGRAPH/MOMENT: Each distinct moment, location, or action should be a separate scene
+3. SEQUENTIAL FLOW: Scenes should follow the narrative order exactly
+4. UNIQUE CONTENT: Each scene must have different content - NO duplicates or repetitions
+5. COMPLETE COVERAGE: All important story beats must be included
+
+VISUAL CONSISTENCY REQUIREMENTS (CRITICAL):
+- CHARACTER CONSISTENCY: All characters must maintain identical appearance, clothing, hairstyle, and physical characteristics across ALL scenes
+- STYLE CONSISTENCY: Maintain the same visual style, color palette, lighting, and artistic direction throughout
+- ENVIRONMENT CONTINUITY: Locations should be visually connected and logically flow from one scene to the next
+- SEAMLESS TRANSITIONS: Each scene should naturally lead to the next with clear visual connections
+- PROPS & DETAILS: Keep consistent props, objects, and environmental details that appear in multiple scenes
+
+RESPONSE FORMAT - Return ONLY JSON array with exactly ${sceneCount} objects:
+Each object must have:
+- index: integer (0-based)
+- description: string (brief scene description with character names and key visual elements)
+- visualPrompt: string (detailed prompt with: character descriptions with specific details, exact clothing/appearance, environment details, lighting/mood, camera angle, and explicit instruction to maintain consistency with previous scenes. 3-4 sentences minimum)
+
+CONSISTENCY INSTRUCTIONS IN VISUAL PROMPTS:
+- Always specify exact character appearance: "Character X wears [specific clothing], has [specific hair], [specific features]"
+- Always reference visual continuity: "Maintain the same visual style and color palette as previous scenes"
+- Always specify environment consistency: "Same location as before with [specific details]"
+- Always include transition guidance: "Seamless visual transition from previous scene"
+    
+Script: ${scriptText}`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -605,10 +694,38 @@ export const parseScriptToScenes = async (scriptText: string, sceneCount: number
   
   try { 
     let scenes = JSON.parse(response.text);
+    
+    // Clean up scenes: remove question marks but preserve other characters
+    if (Array.isArray(scenes)) {
+      scenes = scenes.map((scene: any) => ({
+        ...scene,
+        description: (scene.description || '').replace(/\?+/g, '.').trim(),
+        visualPrompt: (scene.visualPrompt || '').replace(/\?+/g, '.').trim()
+      }));
+    }
+    
     return adjustSceneCount(scenes, sceneCount);
   } catch (e) { 
     console.error("Failed to parse script response:", e);
     return []; 
+  }
+};
+
+// 日志存储函数
+const storeLogs = (message: string) => {
+  try {
+    const logs = JSON.parse(localStorage.getItem('chatWithGemini_logs') || '[]');
+    logs.push({
+      timestamp: new Date().toISOString(),
+      message: message
+    });
+    // 只保留最后 100 条日志
+    if (logs.length > 100) {
+      logs.shift();
+    }
+    localStorage.setItem('chatWithGemini_logs', JSON.stringify(logs));
+  } catch (e) {
+    console.error('Failed to store logs:', e);
   }
 };
 
@@ -618,7 +735,27 @@ export const chatWithGemini = async (messages: any[]) => {
 
   if (config && config.provider !== 'gemini' && config.apiKey) {
     try {
-      const formattedMessages = messages.map(m => {
+      const logMsg1 = '[chatWithGemini] Starting third-party API chat';
+      console.log(logMsg1);
+      storeLogs(logMsg1);
+      
+      const logMsg2 = `[chatWithGemini] Provider: ${config.provider}`;
+      console.log(logMsg2);
+      storeLogs(logMsg2);
+      
+      const logMsg3 = `[chatWithGemini] Base URL: ${config.baseUrl}`;
+      console.log(logMsg3);
+      storeLogs(logMsg3);
+      
+      const logMsg4 = `[chatWithGemini] Model: ${config.llmModel}`;
+      console.log(logMsg4);
+      storeLogs(logMsg4);
+      
+      const logMsg5 = `[chatWithGemini] Input messages count: ${messages.length}`;
+      console.log(logMsg5);
+      storeLogs(logMsg5);
+      
+      const formattedMessages = messages.map((m, idx) => {
         // 安全提取文本内容和图片
         let text = '';
         let images: string[] = [];
@@ -634,6 +771,8 @@ export const chatWithGemini = async (messages: any[]) => {
           images = m.images;
         }
         
+        console.log(`[chatWithGemini] Message ${idx}: role=${m.role}, text_length=${text.length}, images=${images.length}`);
+        
         // 如果有图片，使用 content 数组格式（gpt-4o 支持）
         if (images.length > 0) {
           const content: any[] = [
@@ -644,7 +783,8 @@ export const chatWithGemini = async (messages: any[]) => {
           ];
           
           // 添加图片到 content 数组
-          images.forEach(imageUrl => {
+          images.forEach((imageUrl, imgIdx) => {
+            console.log(`[chatWithGemini] Adding image ${imgIdx}: ${imageUrl.substring(0, 50)}...`);
             content.push({
               type: 'image_url',
               image_url: {
@@ -667,6 +807,16 @@ export const chatWithGemini = async (messages: any[]) => {
         };
       });
 
+      console.log('[chatWithGemini] Formatted messages:', formattedMessages);
+      console.log('[chatWithGemini] Sending request to:', `${config.baseUrl}/v1/chat/completions`);
+      
+      const requestBody = {
+        model: config.llmModel,
+        messages: formattedMessages
+      };
+      
+      console.log('[chatWithGemini] Request body:', JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
@@ -674,22 +824,40 @@ export const chatWithGemini = async (messages: any[]) => {
           'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
-        body: JSON.stringify({
-          model: config.llmModel,
-          messages: formattedMessages
-        })
+        body: JSON.stringify(requestBody)
       });
+      
+      console.log('[chatWithGemini] Response status:', response.status);
+      console.log('[chatWithGemini] Response headers:', {
+        'content-type': response.headers.get('content-type'),
+        'content-length': response.headers.get('content-length')
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[chatWithGemini] API error response:', errorText);
+        throw new Error(`API error: ${response.status} ${errorText}`);
+      }
+      
       const data = await response.json();
+      console.log('[chatWithGemini] Response data:', data);
+      
       const content = data.choices?.[0]?.message?.content;
-      console.log("Third-party chat response:", content);
+      console.log('[chatWithGemini] Extracted content:', content);
+      
       return content || null;
     } catch (e) {
-      console.error("Third-party chat failed", e);
+      console.error('[chatWithGemini] Third-party chat failed:', e);
+      if (e instanceof Error) {
+        console.error('[chatWithGemini] Error message:', e.message);
+        console.error('[chatWithGemini] Error stack:', e.stack);
+      }
       return null;
     }
   }
 
   try {
+    console.log('[chatWithGemini] Starting Gemini API chat');
     const ai = new GoogleGenAI({ apiKey: apiKey || '' });
     
     // 构建完整的对话历史，包含系统指令作为第一条消息
@@ -702,7 +870,7 @@ export const chatWithGemini = async (messages: any[]) => {
         role: 'model',
         parts: [{ text: "I understand. I'll provide expert storyboarding and film direction advice." }]
       },
-      ...messages.map(m => {
+      ...messages.map((m, idx) => {
         // 安全提取文本内容和图片
         let text = '';
         let images: string[] = [];
@@ -718,15 +886,19 @@ export const chatWithGemini = async (messages: any[]) => {
           images = m.images;
         }
         
+        console.log(`[chatWithGemini] Gemini message ${idx}: role=${m.role}, text_length=${text.length}, images=${images.length}`);
+        
         // 构建 parts 数组
         const parts: any[] = [{ text }];
         
         // 添加图片到 parts 数组
-        images.forEach(imageUrl => {
+        images.forEach((imageUrl, imgIdx) => {
+          console.log(`[chatWithGemini] Adding Gemini image ${imgIdx}: ${imageUrl.substring(0, 50)}...`);
           if (imageUrl.startsWith('data:')) {
             // Base64 格式
             const base64Data = imageUrl.split(',')[1];
             const mimeType = imageUrl.split(';')[0].replace('data:', '');
+            console.log(`[chatWithGemini] Image ${imgIdx} is base64, MIME type: ${mimeType}`);
             parts.push({
               inlineData: {
                 mimeType: mimeType || 'image/png',
@@ -735,6 +907,7 @@ export const chatWithGemini = async (messages: any[]) => {
             });
           } else if (imageUrl.startsWith('http')) {
             // URL 格式
+            console.log(`[chatWithGemini] Image ${imgIdx} is HTTP URL`);
             parts.push({
               fileData: {
                 mimeType: 'image/png',
@@ -751,18 +924,19 @@ export const chatWithGemini = async (messages: any[]) => {
       })
     ];
     
-    console.log("Sending conversation history to Gemini:", conversationHistory);
+    console.log('[chatWithGemini] Conversation history prepared, messages count:', conversationHistory.length);
+    console.log('[chatWithGemini] Sending to Gemini API...');
     
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: conversationHistory
     });
     
-    console.log("Gemini response:", response);
+    console.log('[chatWithGemini] Gemini response received:', response);
     
     // 提取文本内容
     if (response.text) {
-      console.log("Got response.text:", response.text);
+      console.log('[chatWithGemini] Got response.text:', response.text);
       return response.text;
     }
     
@@ -770,15 +944,19 @@ export const chatWithGemini = async (messages: any[]) => {
       const candidate = response.candidates[0];
       if (candidate.content && candidate.content.parts && candidate.content.parts[0]) {
         const text = candidate.content.parts[0].text;
-        console.log("Got text from candidate:", text);
+        console.log('[chatWithGemini] Got text from candidate:', text);
         return text || null;
       }
     }
     
-    console.warn("Could not extract text from Gemini response:", response);
+    console.warn('[chatWithGemini] Could not extract text from Gemini response:', response);
     return null;
   } catch (e) {
-    console.error("Gemini chat failed", e);
+    console.error('[chatWithGemini] Gemini chat failed:', e);
+    if (e instanceof Error) {
+      console.error('[chatWithGemini] Error message:', e.message);
+      console.error('[chatWithGemini] Error stack:', e.stack);
+    }
     return null;
   }
 };
@@ -813,14 +991,44 @@ export const generateStoryboardFromDialogue = async (dialogueHistory: any[], fra
   
   const systemPrompts = {
     zh: `你是一位创意分镜导演。根据用户的创意指导，生成恰好${frameCount}个分镜场景。
+
 ${stylePrompt}${durationPrompt}${aspectRatioPrompt}
+
+【关键要求】
+1. 视觉一致性：所有场景中的角色必须保持相同的外观、服装、发型和特征
+2. 风格统一：整个分镜序列保持相同的视觉风格、色调和光线
+3. 环境连贯性：场景之间的环境应该逻辑连接，自然过渡
+4. 画面衔接：每个场景应该自然地引导到下一个场景
+5. 道具一致性：重复出现的物品和环保细节应该保持一致
+
+【visualPrompt要求】
+- 明确指定角色外观：具体的服装、发型、特征
+- 参考视觉连贯性：保持与前面场景相同的视觉风格和色调
+- 指定环境一致性：相同位置的具体细节
+- 包含过渡指导：与前一个场景的无缝视觉过渡
+- 3-4句话，具体详细，不使用问号
+
 返回一个JSON数组，包含对象，字段为：index (int), description (string), visualPrompt (string)。
-每个visualPrompt应该详细具体，用于图像生成。
 不要包含markdown代码块，只返回JSON数组。`,
     en: `You are a creative storyboard director. Based on the user's creative direction, generate exactly ${frameCount} storyboard scenes.
+
 ${stylePrompt}${durationPrompt}${aspectRatioPrompt}
+
+[CRITICAL REQUIREMENTS]
+1. CHARACTER CONSISTENCY: All characters must maintain identical appearance, clothing, hairstyle, and physical characteristics across ALL scenes
+2. VISUAL STYLE UNITY: Maintain the same visual style, color palette, and lighting throughout the entire sequence
+3. ENVIRONMENT CONTINUITY: Scenes should be logically connected with natural visual transitions
+4. SEAMLESS TRANSITIONS: Each scene should naturally lead to the next with clear visual connections
+5. PROP CONSISTENCY: Keep consistent props and environmental details that appear in multiple scenes
+
+[VISUAL PROMPT REQUIREMENTS]
+- Specify exact character appearance: specific clothing, hairstyle, distinctive features
+- Reference visual continuity: maintain the same visual style and color palette as previous scenes
+- Specify environment consistency: same location with specific details
+- Include transition guidance: seamless visual transition from previous scene
+- 3-4 sentences, specific and detailed, no question marks
+
 Return a JSON array with objects containing: index (int), description (string), visualPrompt (string).
-Each visualPrompt should be detailed and specific for image generation.
 Do not include markdown code blocks, just the JSON array.`
   };
   
@@ -923,6 +1131,16 @@ Do not include markdown code blocks, just the JSON array.`
   
   try { 
     let scenes = JSON.parse(response.text);
+    
+    // Clean up scenes: remove question marks but preserve other characters
+    if (Array.isArray(scenes)) {
+      scenes = scenes.map((scene: any) => ({
+        ...scene,
+        description: (scene.description || '').replace(/\?+/g, '.').trim(),
+        visualPrompt: (scene.visualPrompt || '').replace(/\?+/g, '.').trim()
+      }));
+    }
+    
     return adjustSceneCount(scenes, frameCount);
   } catch (e) { 
     console.error("Failed to parse storyboard response:", e);
@@ -957,7 +1175,7 @@ export const editImage = async (
     const imageBlob = await imageResponse.blob();
     
     const formData = new FormData();
-    formData.append('model', config?.imageModel || 'nano-banana');
+    formData.append('model', 'gpt-image-1');  // 使用 gpt-image-1 作为默认
     formData.append('prompt', prompt);
     formData.append('image', imageBlob, 'image.png');
     formData.append('response_format', responseFormat);
@@ -1012,3 +1230,4 @@ export const editImage = async (
   }
   return null;
 };
+
