@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Language, I18N, ModelProvider, ChatMessage, Theme, ExportLayout, SYMBOL_LABELS, SYMBOL_DESCRIPTIONS, StoryboardItem, StyleOption, STYLES, AspectRatio, ImageAttachmentState } from '../types';
 import { chatWithGemini } from '../geminiService';
 import StyleSelector from './StyleSelector';
 import { useHelpAssistant } from './HelpAssistant';
 import { validateImageFile, generateImagePreview, getImageMetadata, convertImageForAPI } from '../lib/image-utils';
+import ScreenshotCaptureService from '../services/ScreenshotCaptureService';
 
 interface SidebarRightProps {
   lang: Language;
@@ -55,13 +56,17 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
 
   // Image attachment state
   const [attachedImage, setAttachedImage] = useState<ImageAttachmentState>({
-    file: null,
-    preview: '',
-    dimensions: null,
-    fileSize: 0,
+    files: [],
+    previews: [],
+    dimensions: [],
+    fileSizes: [],
     isLoading: false,
     error: null,
+    currentIndex: 0,
   });
+
+  const screenshotServiceRef = useRef<ScreenshotCaptureService | null>(null);
+  const [isScreenshotMode, setIsScreenshotMode] = useState(false);
 
   const t = I18N[lang];
   const models: ModelProvider[] = ['banana', 'gemini', 'openai', 'veo'];
@@ -89,53 +94,176 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
   };
 
   // Image attachment handlers
-  const handleImageSelect = async (file: File) => {
+  const handleImageSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
     setAttachedImage(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      // Validate image
-      const validation = await validateImageFile(file);
-      if (!validation.valid) {
-        setAttachedImage(prev => ({
-          ...prev,
-          isLoading: false,
-          error: validation.error || 'Invalid image file',
-        }));
-        return;
+      const newPreviews: string[] = [];
+      const newDimensions: Array<{ width: number; height: number } | null> = [];
+      const newFileSizes: number[] = [];
+      const newFiles: File[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate image
+        const validation = await validateImageFile(file);
+        if (!validation.valid) {
+          setAttachedImage(prev => ({
+            ...prev,
+            isLoading: false,
+            error: validation.error || 'Invalid image file',
+          }));
+          return;
+        }
+
+        // Generate preview
+        const preview = await generateImagePreview(file);
+        
+        // Get metadata
+        const metadata = await getImageMetadata(file);
+
+        newFiles.push(file);
+        newPreviews.push(preview);
+        newDimensions.push({ width: metadata.width, height: metadata.height });
+        newFileSizes.push(metadata.size);
       }
 
-      // Generate preview
-      const preview = await generateImagePreview(file);
-      
-      // Get metadata
-      const metadata = await getImageMetadata(file);
-
       setAttachedImage({
-        file,
-        preview,
-        dimensions: { width: metadata.width, height: metadata.height },
-        fileSize: metadata.size,
+        files: newFiles,
+        previews: newPreviews,
+        dimensions: newDimensions,
+        fileSizes: newFileSizes,
         isLoading: false,
         error: null,
+        currentIndex: 0,
       });
     } catch (error) {
       setAttachedImage(prev => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to process image',
+        error: error instanceof Error ? error.message : 'Failed to process images',
       }));
     }
   };
 
-  const handleRemoveImage = () => {
-    setAttachedImage({
-      file: null,
-      preview: '',
-      dimensions: null,
-      fileSize: 0,
-      isLoading: false,
-      error: null,
-    });
+  const handleRemoveImage = (index?: number) => {
+    if (index !== undefined) {
+      // Remove specific image
+      setAttachedImage(prev => {
+        const newFiles = prev.files.filter((_, i) => i !== index);
+        const newPreviews = prev.previews.filter((_, i) => i !== index);
+        const newDimensions = prev.dimensions.filter((_, i) => i !== index);
+        const newFileSizes = prev.fileSizes.filter((_, i) => i !== index);
+        
+        return {
+          files: newFiles,
+          previews: newPreviews,
+          dimensions: newDimensions,
+          fileSizes: newFileSizes,
+          isLoading: false,
+          error: null,
+          currentIndex: Math.min(prev.currentIndex || 0, newFiles.length - 1),
+        };
+      });
+    } else {
+      // Clear all images
+      setAttachedImage({
+        files: [],
+        previews: [],
+        dimensions: [],
+        fileSizes: [],
+        isLoading: false,
+        error: null,
+        currentIndex: 0,
+      });
+    }
+  };
+
+  // 截图处理函数
+  const handleScreenshot = async () => {
+    try {
+      setIsScreenshotMode(true);
+      setAttachedImage(prev => ({ ...prev, isLoading: true, error: null }));
+      
+      // 初始化截图服务
+      if (!screenshotServiceRef.current) {
+        screenshotServiceRef.current = new ScreenshotCaptureService();
+      }
+      
+      const service = screenshotServiceRef.current;
+      
+      // 启动截图模式
+      await service.startScreenshotMode();
+      
+      // 等待用户按 Print Screen
+      const screenshotBlob = await new Promise<Blob | null>((resolve) => {
+        const handleScreenshotCaptured = (event: any) => {
+          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
+          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
+          resolve(event.detail?.blob || null);
+        };
+        
+        const handleScreenshotError = (event: any) => {
+          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
+          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
+          resolve(null);
+        };
+        
+        window.addEventListener('screenshotCaptured', handleScreenshotCaptured);
+        window.addEventListener('screenshotCaptureError', handleScreenshotError);
+        
+        // 30秒超时
+        setTimeout(() => {
+          window.removeEventListener('screenshotCaptured', handleScreenshotCaptured);
+          window.removeEventListener('screenshotCaptureError', handleScreenshotError);
+          resolve(null);
+        }, 30000);
+      });
+      
+      if (screenshotBlob) {
+        // 将截图转换为 base64
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          
+          // 获取图片元数据
+          const img = new Image();
+          img.onload = () => {
+            // 将 Blob 转换为 File
+            const file = new File([screenshotBlob], `screenshot-${Date.now()}.png`, { type: 'image/png' });
+            setAttachedImage(prev => ({
+              files: [...prev.files, file],
+              previews: [...prev.previews, base64],
+              dimensions: [...prev.dimensions, { width: img.width, height: img.height }],
+              fileSizes: [...prev.fileSizes, screenshotBlob.size],
+              isLoading: false,
+              error: null,
+              currentIndex: prev.files.length,
+            }));
+          };
+          img.src = base64;
+        };
+        reader.readAsDataURL(screenshotBlob);
+      } else {
+        setAttachedImage(prev => ({
+          ...prev,
+          isLoading: false,
+          error: lang === 'zh' ? '截图失败或被取消' : 'Screenshot failed or was cancelled',
+        }));
+      }
+    } catch (error) {
+      console.error('[handleScreenshot] Error:', error);
+      setAttachedImage(prev => ({
+        ...prev,
+        isLoading: false,
+        error: lang === 'zh' ? '截图出错' : 'Screenshot error',
+      }));
+    } finally {
+      setIsScreenshotMode(false);
+    }
   };
 
   const { detectHelpCommand, buildAIPrompt, isLoaded: isKnowledgeBaseLoaded } = useHelpAssistant();
@@ -144,16 +272,30 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     const text = guideText || chatInput;
     if (!text.trim() || isChatLoading) return;
     
-    // Create user message with optional image
+    console.log('[handleSendChat] Starting chat send');
+    console.log('[handleSendChat] Text:', text.substring(0, 50));
+    console.log('[handleSendChat] Attached images:', attachedImage.previews.length);
+    
+    // Create user message with optional images
     const userMessage: ChatMessage = { 
       role: 'user', 
       text,
-      images: attachedImage.preview ? [attachedImage.preview] : undefined
+      images: attachedImage.previews.length > 0 ? attachedImage.previews : undefined
     };
+    
+    console.log('[handleSendChat] User message created:', {
+      role: userMessage.role,
+      text_length: userMessage.text.length,
+      images: userMessage.images?.length || 0
+    });
     
     const history = [...chatHistory, userMessage];
     setChatHistory(history);
     setChatInput('');
+    
+    // Store images before clearing
+    const imagesToSend = attachedImage.previews.length > 0 ? [...attachedImage.previews] : [];
+    console.log('[handleSendChat] Images to send:', imagesToSend.length);
     
     // Clear image attachment after sending
     handleRemoveImage();
@@ -163,7 +305,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       let resp: string;
       
       if (isHelpMode) {
-        // 帮助模式：构建包含知识库的提示词
+        // Help mode: build prompt with knowledge base
         if (!isKnowledgeBaseLoaded) {
           const waitMsg = lang === 'zh' 
             ? '知识库正在加载中，请稍候...' 
@@ -177,19 +319,25 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
         const messagesWithContext = [
           { role: 'user', parts: [{ text: systemContext }] }
         ];
+        console.log('[handleSendChat] Sending help mode message');
         resp = await chatWithGemini(messagesWithContext);
       } else {
-        // 正常对话流程 - 支持图片
+        // Normal chat flow - supports images
+        console.log('[handleSendChat] Sending normal chat message with', history.length, 'messages');
         resp = await chatWithGemini(history);
       }
       
+      console.log('[handleSendChat] Got response:', resp?.substring(0, 50));
       const aiResponse = resp || (lang === 'zh' ? '抱歉，无法获取回复。请检查API配置。' : 'Sorry, unable to get response. Please check API configuration.');
       setChatHistory([...history, { role: 'model', text: aiResponse } as ChatMessage]);
     } catch (e) {
-      console.error("Chat error:", e);
+      console.error('[handleSendChat] Chat error:', e);
       const errorMsg = lang === 'zh' ? '发生错误，请重试。' : 'An error occurred, please try again.';
       setChatHistory([...history, { role: 'model', text: errorMsg } as ChatMessage]);
-    } finally { setIsChatLoading(false); }
+    } finally { 
+      console.log('[handleSendChat] Chat send completed');
+      setIsChatLoading(false); 
+    }
   };
 
   const handleGenerateStoryboard = async () => {
@@ -364,10 +512,11 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                     <button 
                       onClick={() => { 
                         const prompts = getFormattedPrompts();
-                        // 如果返回的是对象（中英文版本），使用中文版本
-                        const content = typeof prompts === 'string' ? prompts : (prompts as any).zh || '';
+                        // 根据当前语言显示对应版本
+                        const currentLang = lang === 'zh' ? 'zh' : 'en';
+                        const content = typeof prompts === 'string' ? prompts : (prompts as any)[currentLang] || '';
                         setEditablePrompts(content); 
-                        setPreviewLang('zh');
+                        setPreviewLang(currentLang);
                         setShowPreviewModal(true); 
                       }} 
                       title={lang === 'zh' ? '预览并编辑导出的提示词' : 'Preview and edit export prompts'}
@@ -524,19 +673,127 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                 </div>
                 <div className={`flex flex-col gap-2 border-t px-4 py-3 flex-shrink-0 relative ${theme === 'dark' ? 'border-white/5' : 'border-zinc-100'}`}>
                   <div className="flex gap-2">
-                    <textarea 
-                      value={chatInput} 
-                      onChange={e => setChatInput(e.target.value)} 
-                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendChat()} 
-                      placeholder={lang === 'zh' ? '输入创意想法... (Shift+Enter 换行)' : 'Brainstorm with AI... (Shift+Enter for new line)'} 
-                      className={`flex-1 bg-transparent text-sm font-bold outline-none border-2 border-purple-500 rounded-xl px-3 py-2 transition-all focus:border-purple-600 focus:shadow-lg focus:shadow-purple-500/30 resize-none min-h-[100px] ${theme === 'dark' ? 'text-white' : 'text-black'}`} 
-                    />
+                    <div className="flex-1 relative">
+                      <textarea 
+                        value={chatInput} 
+                        onChange={e => setChatInput(e.target.value)} 
+                        onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendChat()} 
+                        placeholder={lang === 'zh' ? '输入创意想法... (Shift+Enter 换行)' : 'Brainstorm with AI... (Shift+Enter for new line)'} 
+                        className={`w-full bg-transparent text-sm font-bold outline-none border-2 border-purple-500 rounded-xl px-3 py-2 pr-12 transition-all focus:border-purple-600 focus:shadow-lg focus:shadow-purple-500/30 resize-none min-h-[100px] ${theme === 'dark' ? 'text-white' : 'text-black'}`} 
+                      />
+                      {/* 附件按钮 - 在输入框内右下角 */}
+                      <div className="absolute bottom-2 right-2 flex gap-1 items-end">
+                        {/* 多张图片预览 - 上传成功后显示 */}
+                        {attachedImage.files.length > 0 && (
+                          <div className="relative group flex flex-col gap-1">
+                            {/* 当前图片缩略图 */}
+                            <img 
+                              src={attachedImage.previews[attachedImage.currentIndex || 0]} 
+                              alt="Attached" 
+                              className="w-8 h-8 rounded object-cover border border-blue-400"
+                            />
+                            {/* 图片计数 */}
+                            {attachedImage.files.length > 1 && (
+                              <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                                {(attachedImage.currentIndex || 0) + 1}/{attachedImage.files.length}
+                              </div>
+                            )}
+                            {/* 元数据显示 - 悬停时显示 */}
+                            <div className="absolute bottom-full right-0 mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none z-10">
+                              {attachedImage.dimensions[attachedImage.currentIndex || 0] && (
+                                <div>{attachedImage.dimensions[attachedImage.currentIndex || 0]!.width}×{attachedImage.dimensions[attachedImage.currentIndex || 0]!.height}</div>
+                              )}
+                              {attachedImage.fileSizes[attachedImage.currentIndex || 0] > 0 && (
+                                <div>{(attachedImage.fileSizes[attachedImage.currentIndex || 0] / 1024).toFixed(1)}KB</div>
+                              )}
+                            </div>
+                            {/* 导航按钮 - 多张图片时显示 */}
+                            {attachedImage.files.length > 1 && (
+                              <div className="absolute -bottom-6 left-0 right-0 flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => setAttachedImage(prev => ({
+                                    ...prev,
+                                    currentIndex: (prev.currentIndex || 0) === 0 ? prev.files.length - 1 : (prev.currentIndex || 0) - 1
+                                  }))}
+                                  className="bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-blue-600"
+                                  title={lang === 'zh' ? '上一张' : 'Previous'}
+                                >
+                                  ‹
+                                </button>
+                                <button
+                                  onClick={() => setAttachedImage(prev => ({
+                                    ...prev,
+                                    currentIndex: ((prev.currentIndex || 0) + 1) % prev.files.length
+                                  }))}
+                                  className="bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-blue-600"
+                                  title={lang === 'zh' ? '下一张' : 'Next'}
+                                >
+                                  ›
+                                </button>
+                              </div>
+                            )}
+                            {/* 删除按钮 */}
+                            <button
+                              onClick={() => handleRemoveImage(attachedImage.currentIndex)}
+                              className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-700"
+                              title={lang === 'zh' ? '移除此图片' : 'Remove this image'}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          id="chat-image-input"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          multiple
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleImageSelect(e.target.files);
+                            }
+                            // Reset input so same file can be selected again
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                        />
+                        {/* 截图按钮 */}
+                        <button 
+                          onClick={handleScreenshot}
+                          disabled={isChatLoading || isScreenshotMode}
+                          title={lang === 'zh' ? '截图 (按 Print Screen)' : 'Screenshot (Press Print Screen)'}
+                          className={`w-6 h-6 flex items-center justify-center text-lg transition-all hover:scale-110 ${
+                            isScreenshotMode
+                              ? 'text-orange-500 animate-pulse'
+                              : theme === 'dark'
+                              ? 'text-gray-400 hover:text-gray-300'
+                              : 'text-gray-600 hover:text-gray-700'
+                          } ${(isChatLoading || isScreenshotMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          📸
+                        </button>
+                        {/* 图片上传按钮 */}
+                        <button 
+                          onClick={() => document.getElementById('chat-image-input')?.click()}
+                          disabled={isChatLoading}
+                          title={lang === 'zh' ? '添加图片 (支持JPEG, PNG, WebP, GIF, 可多选)' : 'Add images (JPEG, PNG, WebP, GIF, multiple)'}
+                          className={`w-6 h-6 flex items-center justify-center text-lg transition-all hover:scale-110 ${
+                            attachedImage.files.length > 0
+                              ? 'text-blue-500'
+                              : theme === 'dark'
+                              ? 'text-gray-400 hover:text-gray-300'
+                              : 'text-gray-600 hover:text-gray-700'
+                          } ${isChatLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          📎
+                        </button>
+                      </div>
+                    </div>
                     <div className="flex flex-col gap-2 flex-shrink-0">
                       <button 
                         onClick={() => handleSendChat()} 
                         disabled={!chatInput.trim() || isChatLoading}
                         title={lang === 'zh' ? '发送消息 (Enter)' : 'Send message (Enter)'}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all ${
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all flex-shrink-0 ${
                           chatInput.trim() && !isChatLoading
                             ? 'bg-purple-600 text-white shadow-lg hover:scale-110'
                             : 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
@@ -544,73 +801,36 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                       >
                         ↑
                       </button>
-                      <input
-                        type="file"
-                        id="chat-image-input"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleImageSelect(file);
-                          }
-                          // Reset input so same file can be selected again
-                          e.target.value = '';
-                        }}
-                        className="hidden"
-                      />
+                      {/* 清除对话历史按钮 - 在发送按钮下面，纯图标 */}
                       <button 
-                        onClick={() => document.getElementById('chat-image-input')?.click()}
-                        disabled={isChatLoading}
-                        title={lang === 'zh' ? '添加图片 (支持JPEG, PNG, WebP, GIF)' : 'Add image (JPEG, PNG, WebP, GIF)'}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all ${
-                          !isChatLoading
-                            ? 'bg-blue-600 text-white shadow-lg hover:scale-110'
-                            : 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
+                        onClick={() => setChatHistory([])} 
+                        title={lang === 'zh' ? '清除对话历史' : 'Clear chat history'}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all hover:scale-110 active:scale-95 ${
+                          theme === 'dark' 
+                            ? 'text-red-400 hover:text-red-300' 
+                            : 'text-red-600 hover:text-red-700'
                         }`}
                       >
-                        📎
+                        🗑️
                       </button>
                     </div>
                   </div>
-                  
-                  {/* Image Preview */}
-                  {attachedImage.file && (
-                    <div className={`relative rounded-xl overflow-hidden border-2 ${theme === 'dark' ? 'border-blue-500/50 bg-blue-500/10' : 'border-blue-300 bg-blue-50'}`}>
-                      <div className="relative group">
-                        <img 
-                          src={attachedImage.preview} 
-                          alt="Attached" 
-                          className="w-full h-auto max-h-40 object-cover"
-                        />
-                        <button
-                          onClick={handleRemoveImage}
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-600 text-white rounded-lg p-1 hover:bg-red-700"
-                          title={lang === 'zh' ? '移除图片' : 'Remove image'}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className={`p-2 text-xs font-bold ${theme === 'dark' ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>
-                        <div>{attachedImage.dimensions ? `${attachedImage.dimensions.width}×${attachedImage.dimensions.height}px` : 'Loading...'}</div>
-                        <div>{attachedImage.fileSize ? `${(attachedImage.fileSize / 1024).toFixed(1)}KB` : ''}</div>
-                      </div>
-                    </div>
-                  )}
                   
                   {/* Error Message */}
                   {attachedImage.error && (
                     <div className={`p-2 rounded-lg text-xs font-bold ${theme === 'dark' ? 'bg-red-500/20 text-red-200 border border-red-500/50' : 'bg-red-100 text-red-700 border border-red-300'}`}>
                       {attachedImage.error}
+                      {attachedImage.files.length > 0 && (
+                        <button
+                          onClick={() => setAttachedImage(prev => ({ ...prev, error: null }))}
+                          className="ml-2 underline hover:opacity-70"
+                        >
+                          {lang === 'zh' ? '关闭' : 'Dismiss'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
-                <button 
-                  onClick={() => setChatHistory([])} 
-                  title={lang === 'zh' ? '清除对话历史' : 'Clear chat history'}
-                  className={`w-8 h-8 flex items-center justify-center text-base transition-all hover:scale-110 active:scale-95 bg-gradient-to-br from-red-400 to-red-600 rounded-lg text-white shadow-md hover:shadow-lg`}
-                >
-                  🗑️
-                </button>
                 <button 
                   onClick={() => handleGenerateStoryboard()} 
                   disabled={isLoading || chatHistory.length === 0}
@@ -670,7 +890,8 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                 onClick={() => {
                   setPreviewLang('zh');
                   const prompts = getFormattedPrompts();
-                  const content = typeof prompts === 'string' ? prompts : (prompts as any).zh || '';
+                  // 如果是对象，取中文版本；如果是字符串，直接使用
+                  const content = typeof prompts === 'object' && prompts !== null ? (prompts as any).zh || '' : prompts;
                   setEditablePrompts(content);
                 }}
                 className={`px-4 py-2 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${
@@ -687,7 +908,8 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                 onClick={() => {
                   setPreviewLang('en');
                   const prompts = getFormattedPrompts();
-                  const content = typeof prompts === 'string' ? prompts : (prompts as any).en || '';
+                  // 如果是对象，取英文版本；如果是字符串，直接使用
+                  const content = typeof prompts === 'object' && prompts !== null ? (prompts as any).en || '' : prompts;
                   setEditablePrompts(content);
                 }}
                 className={`px-4 py-2 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${
