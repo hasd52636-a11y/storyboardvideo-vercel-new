@@ -181,7 +181,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     }
   };
 
-  // 截图处理函数 - 直接使用 html2canvas 截图
+  // 截图处理函数 - 直接使用 html2canvas 截图并自动分析
   const handleScreenshot = async () => {
     try {
       setAttachedImage(prev => ({ ...prev, isLoading: true, error: null }));
@@ -198,7 +198,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       });
       
       // 转换为 blob
-      canvas.toBlob((blob) => {
+      canvas.toBlob(async (blob) => {
         if (!blob) {
           setAttachedImage(prev => ({
             ...prev,
@@ -210,14 +210,16 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
         
         // 转换为 base64
         const reader = new FileReader();
-        reader.onloadend = () => {
+        reader.onloadend = async () => {
           const base64 = reader.result as string;
           
           // 获取图片元数据
           const img = new Image();
-          img.onload = () => {
+          img.onload = async () => {
             // 将 Blob 转换为 File
             const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' });
+            
+            // 更新附加图片状态
             setAttachedImage(prev => ({
               files: [...prev.files, file],
               previews: [...prev.previews, base64],
@@ -227,6 +229,16 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
               error: null,
               currentIndex: prev.files.length,
             }));
+            
+            // 自动发送分析请求 - 使用预设提示词
+            const analysisPrompt = lang === 'zh' 
+              ? '请详细分析这张截图中的内容，包括主体、构图、色彩、光线、风格等，并生成一个可用于图像生成的详细提示词。'
+              : 'Please analyze this screenshot in detail, including subject, composition, colors, lighting, style, etc., and generate a detailed prompt suitable for image generation.';
+            
+            // 延迟一下确保状态已更新
+            setTimeout(() => {
+              handleSendChat(analysisPrompt);
+            }, 100);
           };
           img.src = base64;
         };
