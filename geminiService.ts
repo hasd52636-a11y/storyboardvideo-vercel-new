@@ -23,14 +23,16 @@ const isPlaceholder = (text: string): boolean => {
   return /^#+\s*(画面|Scene|scene)\s*\d+\s*$/.test(text.trim());
 };
 
-// ✅ 步骤1：生成视频提示词 - 基于画面提示词和用户设置
+// ✅ 步骤1：生成视频提示词 - 基于两个连续场景的画面提示词生成过渡视频提示词
 export const generateVideoPromptFromVisual = async (
   visualPrompt: string,
   sceneDescription: string,
   style: string,
   frameCount: number,
   sceneIndex: number,
-  language: 'zh' | 'en' = 'en'
+  language: 'zh' | 'en' = 'en',
+  prevVisualPrompt?: string,
+  prevSceneDescription?: string
 ): Promise<string> => {
   const config = getAppConfig();
   const apiKey = config?.apiKey || process.env.API_KEY;
@@ -41,10 +43,54 @@ export const generateVideoPromptFromVisual = async (
   }
 
   const avgCharsPerScene = Math.floor(500 / frameCount);
+  const isLastScene = sceneIndex === frameCount;
+  const isFirstScene = sceneIndex === 1;
   
-  const systemPrompt = language === 'zh'
-    ? `**文 你是视频导演。你的任务是根据给定的【场景说明】和【画面描述】生成视频提示词。
-    
+  // 根据是否是最后一个场景或第一个场景调整系统提示
+  let systemPrompt: string;
+  let userPrompt: string;
+  
+  if (language === 'zh') {
+    if (isLastScene) {
+      // 最后一个场景：只关注该场景本身，告诉AI这是结尾
+      systemPrompt = `**文 你是视频导演。你的任务是根据给定的【场景说明】和【画面描述】生成视频提示词。这是故事的最后一个场景。
+
+【重要规则】：
+1. 必须严格遵循【场景说明】中描述的故事内容
+2. 必须严格遵循【画面描述】中的视觉元素
+3. 不要改变场景的内容、顺序或含义
+4. 不要添加原文中没有的元素
+5. 只添加动作、表情、光线、摄像机运动等动态描述
+6. 这是结尾场景，应该有适当的收尾感
+
+【核心要素（必须包含）】：
+- 角色姿态和肢体语言（基于画面描述）
+- 角色表情和眼神（基于画面描述）
+- 环境光线变化（基于画面描述）
+- 摄像机运动（根据故事情节设计）
+
+【禁止性指令】：
+1. 禁止包含任何标签或前缀，如"Video prompts:"、"视频提示词："等
+2. 禁止包含任何指令性文本，如"Continue from"、"Show the"、"Maintain"等
+3. 禁止包含AI的思考、分析或解释内容
+4. 禁止包含中英混杂的内容，所有内容必须是中文
+
+【要求】：
+- 不超过${avgCharsPerScene}字
+- 返回ONLY视频提示词，不要其他文本
+- 严格遵循原始场景描述，不要创意改编
+- 直接返回纯粹的场景描述，不要任何前缀或标签`;
+
+      userPrompt = `场景${sceneIndex}/${frameCount}（最后一个场景）
+风格：${style}
+画面描述：${visualPrompt}
+场景说明：${sceneDescription}
+
+生成视频提示词：`;
+    } else if (isFirstScene || !prevVisualPrompt) {
+      // 第一个场景：只关注该场景本身
+      systemPrompt = `**文 你是视频导演。你的任务是根据给定的【场景说明】和【画面描述】生成视频提示词。
+
 【重要规则】：
 1. 必须严格遵循【场景说明】中描述的故事内容
 2. 必须严格遵循【画面描述】中的视觉元素
@@ -58,11 +104,42 @@ export const generateVideoPromptFromVisual = async (
 - 环境光线变化（基于画面描述）
 - 摄像机运动（根据故事情节设计）
 
-【补充要素（AI根据故事自动补充）】：
-- 根据故事情节设计符合的各类动作
-- 环境中的动态变化
-- 物体和场景的运动
-- 场景过渡方式
+【禁止性指令】：
+1. 禁止包含任何标签或前缀，如"Video prompts:"、"视频提示词："等
+2. 禁止包含任何指令性文本，如"Continue from"、"Show the"、"Maintain"等
+3. 禁止包含AI的思考、分析或解释内容
+4. 禁止包含中英混杂的内容，所有内容必须是中文
+
+【要求】：
+- 不超过${avgCharsPerScene}字
+- 返回ONLY视频提示词，不要其他文本
+- 严格遵循原始场景描述，不要创意改编
+- 直接返回纯粹的场景描述，不要任何前缀或标签`;
+
+      userPrompt = `场景${sceneIndex}/${frameCount}
+风格：${style}
+画面描述：${visualPrompt}
+场景说明：${sceneDescription}
+
+生成视频提示词：`;
+    } else {
+      // 中间场景：考虑前一个场景和当前场景的过渡
+      systemPrompt = `**文 你是视频导演。你的任务是根据给定的【前一场景】和【当前场景】的画面描述，生成当前场景的视频提示词。重点是场景之间的过渡和连接。
+
+【重要规则】：
+1. 必须严格遵循【当前场景说明】中描述的故事内容
+2. 必须严格遵循【当前画面描述】中的视觉元素
+3. 考虑从【前一场景】到【当前场景】的自然过渡
+4. 不要改变场景的内容、顺序或含义
+5. 不要添加原文中没有的元素
+6. 只添加动作、表情、光线、摄像机运动等动态描述
+
+【核心要素（必须包含）】：
+- 场景过渡的连贯性（从前一场景到当前场景）
+- 角色姿态和肢体语言（基于画面描述）
+- 角色表情和眼神（基于画面描述）
+- 环境光线变化（基于画面描述）
+- 摄像机运动（根据故事情节和过渡设计）
 
 【禁止性指令】：
 1. 禁止包含任何标签或前缀，如"Video prompts:"、"视频提示词："等
@@ -72,11 +149,63 @@ export const generateVideoPromptFromVisual = async (
 
 【要求】：
 - 不超过${avgCharsPerScene}字
-- 与前后场景自然衔接
 - 返回ONLY视频提示词，不要其他文本
 - 严格遵循原始场景描述，不要创意改编
-- 直接返回纯粹的场景描述，不要任何前缀或标签`
-    : `**文 You are a video director. Your task is to generate a video prompt based on the given 【Description】 and 【Visual】.
+- 直接返回纯粹的场景描述，不要任何前缀或标签`;
+
+      userPrompt = `场景${sceneIndex}/${frameCount}
+风格：${style}
+
+【前一场景】
+画面描述：${prevVisualPrompt}
+场景说明：${prevSceneDescription}
+
+【当前场景】
+画面描述：${visualPrompt}
+场景说明：${sceneDescription}
+
+根据前一场景和当前场景的过渡，生成当前场景的视频提示词：`;
+    }
+  } else {
+    if (isLastScene) {
+      // 最后一个场景：只关注该场景本身，告诉AI这是结尾
+      systemPrompt = `**文 You are a video director. Your task is to generate a video prompt based on the given 【Description】 and 【Visual】. This is the final scene of the story.
+
+【Important Rules】:
+1. Strictly follow the story content in 【Description】
+2. Strictly follow the visual elements in 【Visual】
+3. Do not change the content, order, or meaning of the scene
+4. Do not add elements not in the original text
+5. Only add dynamic descriptions like actions, expressions, lighting, camera movements
+6. This is the ending scene, should have appropriate closure
+
+【Core Elements (must include)】:
+- Character posture and body language (based on visual)
+- Character expressions and eye contact (based on visual)
+- Environmental lighting changes (based on visual)
+- Camera movements (designed based on story)
+
+【Prohibited Instructions】:
+1. Do NOT include any labels or prefixes, such as "Video prompts:", "Video prompt:" etc.
+2. Do NOT include any instructional text, such as "Continue from", "Show the", "Maintain", etc.
+3. Do NOT include AI's thinking, analysis, or explanatory content
+4. Do NOT mix Chinese and English content, all content must be in English
+
+【Requirements】:
+- Max ${avgCharsPerScene} characters
+- Return ONLY the video prompt, no other text
+- Strictly follow the original scene description, no creative modifications
+- Return pure scene description directly, no prefixes or labels`;
+
+      userPrompt = `Scene ${sceneIndex}/${frameCount} (Final Scene)
+Style: ${style}
+Visual: ${visualPrompt}
+Description: ${sceneDescription}
+
+Generate video prompt:`;
+    } else if (isFirstScene || !prevVisualPrompt) {
+      // 第一个场景：只关注该场景本身
+      systemPrompt = `**文 You are a video director. Your task is to generate a video prompt based on the given 【Description】 and 【Visual】.
 
 【Important Rules】:
 1. Strictly follow the story content in 【Description】
@@ -91,11 +220,42 @@ export const generateVideoPromptFromVisual = async (
 - Environmental lighting changes (based on visual)
 - Camera movements (designed based on story)
 
-【Supplementary Elements (AI adds based on story)】:
-- Actions designed to fit the narrative
-- Environmental dynamics
-- Object and scene movements
-- Scene transitions
+【Prohibited Instructions】:
+1. Do NOT include any labels or prefixes, such as "Video prompts:", "Video prompt:" etc.
+2. Do NOT include any instructional text, such as "Continue from", "Show the", "Maintain", etc.
+3. Do NOT include AI's thinking, analysis, or explanatory content
+4. Do NOT mix Chinese and English content, all content must be in English
+
+【Requirements】:
+- Max ${avgCharsPerScene} characters
+- Return ONLY the video prompt, no other text
+- Strictly follow the original scene description, no creative modifications
+- Return pure scene description directly, no prefixes or labels`;
+
+      userPrompt = `Scene ${sceneIndex}/${frameCount}
+Style: ${style}
+Visual: ${visualPrompt}
+Description: ${sceneDescription}
+
+Generate video prompt:`;
+    } else {
+      // 中间场景：考虑前一个场景和当前场景的过渡
+      systemPrompt = `**文 You are a video director. Your task is to generate a video prompt for the current scene based on the 【Previous Scene】 and 【Current Scene】 visuals. Focus on the transition and connection between scenes.
+
+【Important Rules】:
+1. Strictly follow the story content in 【Current Description】
+2. Strictly follow the visual elements in 【Current Visual】
+3. Consider the natural transition from 【Previous Scene】 to 【Current Scene】
+4. Do not change the content, order, or meaning of the scene
+5. Do not add elements not in the original text
+6. Only add dynamic descriptions like actions, expressions, lighting, camera movements
+
+【Core Elements (must include)】:
+- Scene transition continuity (from previous to current scene)
+- Character posture and body language (based on visual)
+- Character expressions and eye contact (based on visual)
+- Environmental lighting changes (based on visual)
+- Camera movements (designed based on story and transition)
 
 【Prohibited Instructions】:
 1. Do NOT include any labels or prefixes, such as "Video prompts:", "Video prompt:" etc.
@@ -105,24 +265,24 @@ export const generateVideoPromptFromVisual = async (
 
 【Requirements】:
 - Max ${avgCharsPerScene} characters
-- Connect smoothly with adjacent scenes
 - Return ONLY the video prompt, no other text
 - Strictly follow the original scene description, no creative modifications
 - Return pure scene description directly, no prefixes or labels`;
 
-  const userPrompt = language === 'zh'
-    ? `场景${sceneIndex}/${frameCount}
-风格：${style}
-画面描述：${visualPrompt}
-场景说明：${sceneDescription}
-
-生成视频提示词：`
-    : `Scene ${sceneIndex}/${frameCount}
+      userPrompt = `Scene ${sceneIndex}/${frameCount}
 Style: ${style}
+
+【Previous Scene】
+Visual: ${prevVisualPrompt}
+Description: ${prevSceneDescription}
+
+【Current Scene】
 Visual: ${visualPrompt}
 Description: ${sceneDescription}
 
-Generate video prompt:`;
+Based on the transition between previous and current scenes, generate the video prompt for the current scene:`;
+    }
+  }
 
   try {
     if (config && config.provider !== 'gemini' && config.apiKey) {
@@ -258,10 +418,39 @@ const adjustSceneCount = (scenes: any[], targetCount: number): ScriptScene[] => 
   }
 
   if (scenes.length < targetCount) {
-    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Cannot auto-generate scenes without AI context.`);
-    // Return what we have - don't auto-generate scenes with instruction text
-    // The AI should be responsible for generating the correct number of scenes
-    return scenesWithPlaceholders;
+    console.warn(`AI returned ${scenes.length} scenes but ${targetCount} were requested. Generating continuation scenes.`);
+    const padded = [...scenesWithPlaceholders];
+    
+    // 基于已有场景生成后续场景 - 不包含指令文本
+    while (padded.length < targetCount) {
+      const sceneIndex = padded.length;
+      const lastScene = padded[padded.length - 1];
+      
+      // 基于最后一个场景生成后续场景
+      const lastDescription = lastScene?.description || '';
+      const lastVisualPrompt = lastScene?.visualPrompt || '';
+      
+      // 生成后续场景描述 - 纯粹的故事描述，不包含指令
+      const continuationDescription = `${lastDescription} The story continues with the next development.`;
+      
+      // 生成后续场景的视觉提示 - 纯粹的视觉描述，不包含指令
+      // 基于前一个场景的内容推断下一个场景
+      const continuationVisualPrompt = lastVisualPrompt.length > 0 
+        ? `Following the previous scene, the next visual development shows the natural progression of the story.`
+        : `The next scene in the story.`;
+      
+      // 视频提示词将由 AI 生成，这里先设置为空，后续会填充
+      padded.push({
+        index: padded.length,
+        description: continuationDescription,
+        visualPrompt: continuationVisualPrompt,
+        videoPrompt: '',
+        videoPromptEn: '',
+        hasPlaceholder: false,
+        needsVideoPrompt: true
+      });
+    }
+    return padded;
   }
 
   return scenesWithPlaceholders;
@@ -1535,90 +1724,70 @@ export const generateStoryboardFromDialogue = async (dialogueHistory: any[], fra
   const aspectRatioPrompt = aspectRatio ? (language === 'zh' ? `画面比例：${aspectRatio}。` : `Aspect ratio: ${aspectRatio}. `) : '';
   
   const systemPrompts = {
-    zh: `**文 你是一位世界级电影导演，有着敏锐的观察视角和叙事方式。你的任务是根据用户与AI对话的全部内容，严格按照用户描述的故事情节生成${frameCount}个场景。
+    zh: `**文 你是一位世界级电影导演。你的任务是根据用户与AI对话的全部内容，严格按照用户描述的故事情节生成${frameCount}个场景。
 
-【故事参考来源】
-你必须ONLY参考以下内容来生成故事：
-- 用户在对话中明确描述的故事情节
-- 用户提到的角色、地点、事件
-- 用户对故事走向的描述
+【必须满足的条件】
+1. 必须恰好生成${frameCount}个场景，不能多也不能少
+2. 每个场景必须包含：index、description、visualPrompt、videoPrompt 四个字段
+3. 必须严格遵循用户描述的故事情节，不要改变故事的核心内容、角色关系或情节发展
+4. 必须保持故事完整性、叙事连贯性、角色一致性、视觉和风格的一致性
+5. 所有场景的画面描述词相加小于800字
+6. 所有场景的视频提示词字数相加小于700字
 
-【生成必须满足的条件】
-第一：必须恰好生成${frameCount}个场景
-第二：必须严格遵循【故事参考来源】中的内容，不要改变故事的核心内容、角色关系或情节发展
-第三：必须保持故事完整性、叙事连贯性、角色一致性、视觉和风格的一致性
-第四：所有场景的画面描述词相加小于800字
-第五：所有场景的视频提示词字数相加小于700字
-第六：要求返回JSON格式，包含：
-  - index: 场景索引（0开始）
-  - description: 场景描述（完整的故事情节描述，不要简短，必须忠实于【故事参考来源】中的用户故事）
-  - visualPrompt: 画面提示词（2-3句话，详细描述视觉内容，不要包含任何指令或分析文本）
-  - videoPrompt: 视频提示词（3-4句话，包括摄像机运动、人物动作等动态描述，不要包含任何指令或分析文本）
+【每个场景的要求】
+- index: 场景索引（0开始）
+- description: 完整的故事情节描述，不要简短，必须忠实于用户的故事
+- visualPrompt: 2-3句话，详细描述视觉内容，不要包含任何指令或分析文本
+- videoPrompt: 3-4句话，包括摄像机运动、人物动作等动态描述，不要包含任何指令或分析文本
 
-【禁止性指令】
-1. 禁止改变【故事参考来源】中的故事核心情节、角色关系或故事走向
-2. 禁止添加【故事参考来源】中没有提到的新角色、新地点或新元素
-3. 禁止进行创意改编或二次创作，必须严格遵循【故事参考来源】中的用户描述
-4. 禁止使用任何特殊符号、编号或格式标记来标识visualPrompt和videoPrompt
-5. 禁止在visualPrompt和videoPrompt前添加"Visual:"、"Video:"、"画面提示词："、"视频提示词："等标签
-6. 禁止使用"分镜"、"漫画"、"多格"等关键词
-7. 禁止在JSON数组外添加任何解释文字、markdown代码块或其他额外内容
-8. 只返回JSON数组，不返回${frameCount}个场景以外的内容
-9. 禁止返回中英混杂的内容，所有内容必须是中文
-10. 禁止在visualPrompt和videoPrompt中包含任何指令性文本，如"Continue from"、"Show the"、"Maintain"、"Build upon"等
-11. 禁止在visualPrompt和videoPrompt中包含任何标签或前缀
-12. 禁止在visualPrompt和videoPrompt中包含AI的思考、分析或解释内容
-13. visualPrompt和videoPrompt必须是纯粹的场景描述，直接描述画面和动作
-
-【创作指导】
-- 视觉风格：${style || '默认风格'}
-- 画面比例：${aspectRatio || '16:9'}
-${durationPrompt}${stylePrompt}${aspectRatioPrompt}
+【禁止】
+1. 禁止改变用户故事的核心情节、角色关系或故事走向
+2. 禁止添加用户没有提到的新角色、新地点或新元素
+3. 禁止进行创意改编或二次创作
+4. 禁止使用任何特殊符号、编号或格式标记
+5. 禁止在visualPrompt和videoPrompt前添加标签
+6. 禁止在JSON数组外添加任何解释文字
+7. 禁止返回中英混杂的内容，所有内容必须是中文
+8. 禁止在visualPrompt和videoPrompt中包含任何指令性文本
+9. 禁止在visualPrompt和videoPrompt中包含AI的思考、分析或解释内容
 
 【返回格式】
-只返回JSON数组，例如：[{"index":0,"description":"...","visualPrompt":"...","videoPrompt":"..."},...]`,
-    en: `**文 You are a world-class film director with keen observation and narrative skills. Your task is to generate exactly ${frameCount} scenes based strictly on the user's story description from the dialogue history.
+只返回JSON数组，包含恰好${frameCount}个场景对象。例如：
+[{"index":0,"description":"...","visualPrompt":"...","videoPrompt":"..."},{"index":1,"description":"...","visualPrompt":"...","videoPrompt":"..."},...]
 
-【Story Reference Source】
-You MUST ONLY reference the following content to generate the story:
-- The story plot explicitly described by the user in the dialogue
-- Characters, locations, and events mentioned by the user
-- The user's description of story direction and development
+重要：必须返回${frameCount}个场景，不能少于${frameCount}个。`,
+    en: `**文 You are a world-class film director. Your task is to generate exactly ${frameCount} scenes based strictly on the user's story description from the dialogue history.
 
-【Requirements for Generation】
-First: Generate exactly ${frameCount} scenes
-Second: Strictly follow the content in 【Story Reference Source】, do NOT change the core story content, character relationships, or plot development
-Third: Maintain story completeness, narrative continuity, character consistency, and visual style consistency
-Fourth: Total character count of all visual prompts must be less than 800 characters
-Fifth: Total character count of all video prompts must be less than 700 characters
-Sixth: Return JSON format containing:
-  - index: scene index (starting from 0)
-  - description: scene description (complete story plot description, not brief, must be faithful to the user's story in 【Story Reference Source】)
-  - visualPrompt: visual prompt (2-3 sentences, detailed visual content description, NO instructions or analysis text)
-  - videoPrompt: video prompt (3-4 sentences with camera movement, character actions, and dynamic descriptions, NO instructions or analysis text)
+【Must-Have Requirements】
+1. Generate exactly ${frameCount} scenes, no more, no less
+2. Each scene must contain: index, description, visualPrompt, videoPrompt fields
+3. Strictly follow the user's story plot, do NOT change the core story content, character relationships, or plot development
+4. Maintain story completeness, narrative continuity, character consistency, and visual style consistency
+5. Total character count of all visual prompts must be less than 800 characters
+6. Total character count of all video prompts must be less than 700 characters
 
-【Prohibited Instructions】
-1. Do NOT change the core plot, character relationships, or story direction from 【Story Reference Source】
-2. Do NOT add new characters, locations, or elements not mentioned in 【Story Reference Source】
-3. Do NOT perform creative adaptations or secondary creations, must strictly follow the user's description in 【Story Reference Source】
-4. Do NOT use any special symbols, numbers, or format markers to identify visualPrompt and videoPrompt
-5. Do NOT add labels like "Visual:", "Video:", "Visual Prompt:", "Video Prompt:" before visualPrompt and videoPrompt
-6. Do NOT use keywords like "storyboard", "comic", "multi-panel"
-7. Do NOT add any explanatory text, markdown code blocks, or additional content outside the JSON array
-8. Return only JSON array with exactly ${frameCount} scenes, no more, no less
-9. Do NOT mix Chinese and English content, all content must be in English
-10. Do NOT include any instructional text in visualPrompt and videoPrompt, such as "Continue from", "Show the", "Maintain", "Build upon", etc.
-11. Do NOT include any labels or prefixes in visualPrompt and videoPrompt
-12. Do NOT include AI's thinking, analysis, or explanatory content in visualPrompt and videoPrompt
-13. visualPrompt and videoPrompt must be pure scene descriptions, directly describing visuals and actions
+【Requirements for Each Scene】
+- index: scene index (starting from 0)
+- description: complete story plot description, not brief, must be faithful to the user's story
+- visualPrompt: 2-3 sentences, detailed visual content description, NO instructions or analysis text
+- videoPrompt: 3-4 sentences with camera movement, character actions, and dynamic descriptions, NO instructions or analysis text
 
-【Creative Guidance】
-- Visual style: ${style || 'default style'}
-- Aspect ratio: ${aspectRatio || '16:9'}
-${durationPrompt}${stylePrompt}${aspectRatioPrompt}
+【Prohibited】
+1. Do NOT change the core plot, character relationships, or story direction
+2. Do NOT add new characters, locations, or elements not mentioned by the user
+3. Do NOT perform creative adaptations or secondary creations
+4. Do NOT use any special symbols, numbers, or format markers
+5. Do NOT add labels before visualPrompt and videoPrompt
+6. Do NOT add any explanatory text outside the JSON array
+7. Do NOT mix Chinese and English content, all content must be in English
+8. Do NOT include any instructional text in visualPrompt and videoPrompt
+9. Do NOT include AI's thinking, analysis, or explanatory content in visualPrompt and videoPrompt
 
 【Return Format】
-Return only JSON array, for example: [{"index":0,"description":"...","visualPrompt":"...","videoPrompt":"..."},...]`
+Return only JSON array containing exactly ${frameCount} scene objects. For example:
+[{"index":0,"description":"...","visualPrompt":"...","videoPrompt":"..."},{"index":1,"description":"...","visualPrompt":"...","videoPrompt":"..."},...]
+
+IMPORTANT: Must return ${frameCount} scenes, not less than ${frameCount}.`
   };
   
   const systemPrompt = systemPrompts[language];
@@ -1697,7 +1866,7 @@ Return only JSON array, for example: [{"index":0,"description":"...","visualProm
         ...scene,
         description: (scene.description || '').replace(/\?+/g, '.').trim(),
         visualPrompt: extractPromptContent((scene.visualPrompt || ''), 'visual'),
-        videoPrompt: extractPromptContent((scene.videoPrompt || ''), 'video')
+        videoPrompt: ''
       }));
       
       return adjustSceneCount(scenes, frameCount);
@@ -1721,10 +1890,9 @@ Return only JSON array, for example: [{"index":0,"description":"...","visualProm
           properties: {
             index: { type: Type.INTEGER },
             description: { type: Type.STRING },
-            visualPrompt: { type: Type.STRING },
-            videoPrompt: { type: Type.STRING }
+            visualPrompt: { type: Type.STRING }
           },
-          required: ["index", "description", "visualPrompt", "videoPrompt"]
+          required: ["index", "description", "visualPrompt"]
         }
       }
     }
@@ -1739,33 +1907,11 @@ Return only JSON array, for example: [{"index":0,"description":"...","visualProm
         ...scene,
         description: (scene.description || '').replace(/\?+/g, '.').trim(),
         visualPrompt: extractPromptContent((scene.visualPrompt || ''), 'visual'),
-        videoPrompt: extractPromptContent((scene.videoPrompt || ''), 'video')
+        videoPrompt: ''
       }));
     }
     
-    const adjustedScenes = adjustSceneCount(scenes, frameCount);
-    
-    // 为需要视频提示词的场景生成 AI 视频提示词
-    const scenesNeedingPrompts = adjustedScenes.filter((s: any) => s.needsVideoPrompt);
-    if (scenesNeedingPrompts.length > 0) {
-      console.log('[generateStoryboardFromDialogue] Generating video prompts for', scenesNeedingPrompts.length, 'scenes');
-      
-      // 生成中文视频提示词
-      const zhPrompts = await generateVideoPrompts(adjustedScenes, frameCount, 'zh');
-      // 生成英文视频提示词
-      const enPrompts = await generateVideoPrompts(adjustedScenes, frameCount, 'en');
-      
-      // 填充视频提示词
-      adjustedScenes.forEach((scene: any, idx: number) => {
-        if (scene.needsVideoPrompt) {
-          scene.videoPrompt = zhPrompts[idx] || '';
-          scene.videoPromptEn = enPrompts[idx] || '';
-          delete scene.needsVideoPrompt;
-        }
-      });
-    }
-    
-    return adjustedScenes;
+    return adjustSceneCount(scenes, frameCount);
   } catch (e) { 
     console.error("Failed to parse storyboard response:", e);
     return []; 

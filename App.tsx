@@ -380,7 +380,9 @@ const App: React.FC = () => {
                     style?.nameZh || style?.name || 'Realistic Photography',
                     scenes.length,
                     sceneIndex + 1,
-                    'zh'
+                    'zh',
+                    sceneIndex > 0 ? scenes[sceneIndex - 1].visualPrompt : '',
+                    sceneIndex > 0 ? scenes[sceneIndex - 1].description : ''
                   );
                   videoPromptEn = '';
                 } else {
@@ -390,7 +392,9 @@ const App: React.FC = () => {
                     style?.nameZh || style?.name || 'Realistic Photography',
                     scenes.length,
                     sceneIndex + 1,
-                    'en'
+                    'en',
+                    sceneIndex > 0 ? scenes[sceneIndex - 1].visualPrompt : '',
+                    sceneIndex > 0 ? scenes[sceneIndex - 1].description : ''
                   );
                   videoPromptZh = '';
                 }
@@ -575,18 +579,30 @@ const App: React.FC = () => {
                   visualPromptZh = placeholderItem.visualPrompt || '';
                   visualPromptEn = '';
                   
+                  // 获取前一个场景的信息（如果不是第一个场景）
+                  const prevScene = sceneIndex > 0 ? scenes[sceneIndex - 1] : null;
+                  const prevVisualPrompt = prevScene?.visualPrompt || '';
+                  const prevSceneDescription = prevScene?.description || '';
+                  
                   videoPromptZh = await generateVideoPromptFromVisual(
                     visualPromptZh,
                     scene.description,
                     style?.nameZh || style?.name || 'Realistic Photography',
                     frameCount,
                     sceneIndex + 1,
-                    'zh'
+                    'zh',
+                    prevVisualPrompt,
+                    prevSceneDescription
                   );
                   videoPromptEn = '';
                 } else {
                   visualPromptEn = placeholderItem.visualPrompt || '';
                   visualPromptZh = '';
+                  
+                  // 获取前一个场景的信息（如果不是第一个场景）
+                  const prevScene = sceneIndex > 0 ? scenes[sceneIndex - 1] : null;
+                  const prevVisualPrompt = prevScene?.visualPrompt || '';
+                  const prevSceneDescription = prevScene?.description || '';
                   
                   videoPromptEn = await generateVideoPromptFromVisual(
                     visualPromptEn,
@@ -594,7 +610,9 @@ const App: React.FC = () => {
                     style?.nameZh || style?.name || 'Realistic Photography',
                     frameCount,
                     sceneIndex + 1,
-                    'en'
+                    'en',
+                    prevVisualPrompt,
+                    prevSceneDescription
                   );
                   videoPromptZh = '';
                 }
@@ -672,18 +690,30 @@ const App: React.FC = () => {
               visualPromptZh = scene.visualPrompt || '';
               visualPromptEn = '';
               
+              // 获取前一个场景的信息（如果不是第一个场景）
+              const prevScene = index > 0 ? scenes[index - 1] : null;
+              const prevVisualPrompt = prevScene?.visualPrompt || '';
+              const prevSceneDescription = prevScene?.description || '';
+              
               videoPromptZh = await generateVideoPromptFromVisual(
                 visualPromptZh,
                 scene.description,
                 style?.nameZh || style?.name || 'Realistic Photography',
                 frameCount,
                 index + 1,
-                'zh'
+                'zh',
+                prevVisualPrompt,
+                prevSceneDescription
               );
               videoPromptEn = '';
             } else {
               visualPromptEn = scene.visualPrompt || '';
               visualPromptZh = '';
+              
+              // 获取前一个场景的信息（如果不是第一个场景）
+              const prevScene = index > 0 ? scenes[index - 1] : null;
+              const prevVisualPrompt = prevScene?.visualPrompt || '';
+              const prevSceneDescription = prevScene?.description || '';
               
               videoPromptEn = await generateVideoPromptFromVisual(
                 visualPromptEn,
@@ -691,7 +721,9 @@ const App: React.FC = () => {
                 style?.nameZh || style?.name || 'Realistic Photography',
                 frameCount,
                 index + 1,
-                'en'
+                'en',
+                prevVisualPrompt,
+                prevSceneDescription
               );
               videoPromptZh = '';
             }
