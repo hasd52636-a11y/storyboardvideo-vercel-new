@@ -20,39 +20,40 @@ interface SidebarRightProps {
   model: ModelProvider;
   setModel: (m: ModelProvider) => void;
   onGenerateFromDialogue?: (scenes: any[], frameCount: number, style: string, aspectRatio?: string, duration?: number) => void;
+  onGenerateScriptPreview?: (scenes: any[], frameCount: number, styleId: string, aspectRatio?: string, duration?: number) => void;
   globalColorMode: 'color' | 'blackAndWhite';
   onOpenHelp?: () => void;
   onStyleChange?: (style: StyleOption | null) => void;
   onAspectRatioChange?: (ratio: AspectRatio | null) => void;
   onGenerateVideo?: () => void;
   selectedCount?: number;
+  currentSymbols?: Array<{ name: string }>;
+  symbolDescriptions?: Record<string, Record<string, string>>;
 }
 
 const SidebarRight: React.FC<SidebarRightProps> = ({ 
-  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, selectedCount
+  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, onGenerateScriptPreview, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, selectedCount, currentSymbols = [], symbolDescriptions = {}
 }) => {
-  const [activeTab, setActiveTab] = useState<'script' | 'chat'>('chat');
-  const [scriptInput, setScriptInput] = useState('');
-  const [frameCount, setFrameCount] = useState(1);
+  const [activeTab, setActiveTab] = useState<'scriptCreation' | 'videoEdit'>('scriptCreation');
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [editablePrompts, setEditablePrompts] = useState('');
   const [showChatGuide, setShowChatGuide] = useState(true);
   const [isHelpMode, setIsHelpMode] = useState(false);
-  const [previewLang, setPreviewLang] = useState<'zh' | 'en'>('zh');
   
-  // Script mode style
+  // Script creation mode - for image generation
   const [scriptStyle, setScriptStyle] = useState<StyleOption | null>(null);
   const [scriptDuration, setScriptDuration] = useState(0);
   const [scriptAspectRatio, setScriptAspectRatio] = useState<AspectRatio | null>(null);
   
-  // Chat mode config
+  // Chat mode config - for dialogue-based generation
   const [chatFrameCount, setChatFrameCount] = useState(1);
   const [chatDuration, setChatDuration] = useState(0);
   const [chatStyle, setChatStyle] = useState<StyleOption | null>(null);
   const [chatAspectRatio, setChatAspectRatio] = useState<AspectRatio | null>(null);
+  
+  // Video edit mode - for video generation and prompts
+  const [videoEditStyle, setVideoEditStyle] = useState<StyleOption | null>(null);
 
   // Image attachment state
   const [attachedImage, setAttachedImage] = useState<ImageAttachmentState>({
@@ -73,15 +74,20 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
   const t = I18N[lang];
   const models: ModelProvider[] = ['banana', 'gemini', 'openai', 'veo'];
 
-  // 包装函数：更新风格并通知父组件
+  // 包装函数：更新脚本创作风格（用于生成图片）
   const handleScriptStyleChange = (style: StyleOption | null) => {
     setScriptStyle(style);
+  };
+
+  // 包装函数：更新视频编辑风格（用于全局指令）
+  const handleVideoEditStyleChange = (style: StyleOption | null) => {
+    setVideoEditStyle(style);
     onStyleChange?.(style);
   };
 
+  // 包装函数：更新聊天模式风格（用于生成图片）
   const handleChatStyleChange = (style: StyleOption | null) => {
     setChatStyle(style);
-    onStyleChange?.(style);
   };
 
   // 包装函数：更新画幅并通知父组件
@@ -356,7 +362,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
 
   const handleGenerateStoryboard = async () => {
     if (chatHistory.length === 0) return;
-    if (!onGenerateFromDialogue) return;
+    if (!onGenerateScriptPreview) return;
     
     // Import the functions here to avoid circular dependency
     const { generateStoryboardFromDialogue } = await import('../geminiService');
@@ -377,9 +383,9 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       
       console.log("Generated scenes:", scenes);
       
-      // Call the parent handler with the generated scenes
+      // Call the parent handler to show preview dialog
       if (scenes && scenes.length > 0) {
-        onGenerateFromDialogue(scenes, chatFrameCount, chatStyle?.id || '', chatAspectRatio || undefined, chatDuration > 0 ? chatDuration : undefined);
+        onGenerateScriptPreview(scenes, chatFrameCount, chatStyle?.id || '', chatAspectRatio || undefined, chatDuration > 0 ? chatDuration : undefined);
       }
     } catch (e) {
       console.error("Failed to generate storyboard from dialogue", e);
@@ -388,7 +394,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     }
   };
 
-  const toggleSidebar = (tab?: 'script' | 'chat') => {
+  const toggleSidebar = (tab?: 'scriptCreation' | 'videoEdit') => {
     if (tab) {
       if (isExpanded && activeTab === tab) {
         setIsExpanded(false);
@@ -408,47 +414,36 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       <div className={`flex flex-col h-full ${!isExpanded ? 'items-center' : ''}`}>
         <div className={`flex border-b w-full ${theme === 'dark' ? 'border-white/5' : 'border-zinc-100'}`}>
           <button 
-            onClick={() => toggleSidebar('script')} 
-            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'script' && isExpanded ? 'text-purple-500 border-b-4 border-purple-500' : 'text-zinc-500'}`}
-            title={t.scriptMode}
+            onClick={() => toggleSidebar('scriptCreation')} 
+            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'scriptCreation' && isExpanded ? 'text-purple-500 border-b-4 border-purple-500' : 'text-zinc-500'}`}
+            title={lang === 'zh' ? '脚本创作' : 'Script Creation'}
           >
-            {isExpanded ? t.scriptMode : '📄'}
+            {isExpanded ? (lang === 'zh' ? '脚本创作' : 'Script Creation') : '✍️'}
           </button>
           <button 
-            onClick={() => toggleSidebar('chat')} 
-            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'chat' && isExpanded ? 'text-purple-500 border-b-4 border-purple-500' : 'text-zinc-500'}`}
-            title={t.chatMode}
+            onClick={() => toggleSidebar('videoEdit')} 
+            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'videoEdit' && isExpanded ? 'text-purple-500 border-b-4 border-purple-500' : 'text-zinc-500'}`}
+            title={lang === 'zh' ? '视频编辑' : 'Video Edit'}
           >
-            {isExpanded ? t.chatMode : '💬'}
+            {isExpanded ? (lang === 'zh' ? '视频编辑' : 'Video Edit') : '🎬'}
           </button>
         </div>
 
         {/* Expanded Content */}
         {isExpanded && (
           <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
-            {activeTab === 'script' ? (
+            {activeTab === 'videoEdit' ? (
               <div className="flex-1 overflow-y-auto no-scrollbar p-10 space-y-12">
                 <section className="space-y-5">
                   <div className="space-y-3">
                     <h3 className="text-xs font-black uppercase tracking-widest opacity-50">{lang === 'zh' ? '生成配置' : 'Generation Config'}</h3>
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <div className="flex justify-between text-xs font-black uppercase opacity-50">
-                          <span>{t.frameCount}</span>
-                          <span>{frameCount}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setFrameCount(Math.max(1, frameCount - 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>−</button>
-                          <input type="number" min="1" max="16" value={frameCount} onChange={e => setFrameCount(Math.max(1, Math.min(16, Number(e.target.value))))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold border text-center outline-none ${theme === 'dark' ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-50 border-zinc-300 text-black'}`} />
-                          <button onClick={() => setFrameCount(Math.min(16, frameCount + 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>+</button>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
                         <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '风格' : 'Style'}</label>
-                        {scriptStyle && <StyleSelector selectedStyle={scriptStyle} onStyleChange={setScriptStyle} lang={lang} theme={theme} />}
-                        {!scriptStyle && (
+                        {videoEditStyle && <StyleSelector selectedStyle={videoEditStyle} onStyleChange={handleVideoEditStyleChange} lang={lang} theme={theme} />}
+                        {!videoEditStyle && (
                           <button
-                            onClick={() => setScriptStyle(STYLES[0])}
+                            onClick={() => handleVideoEditStyleChange(STYLES[0])}
                             className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold transition-all ${
                               theme === 'dark'
                                 ? 'bg-white/5 border-white/10 text-white/50 hover:border-purple-500/50'
@@ -466,45 +461,124 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                         </div>
                         <input type="range" min="5" max="120" step="5" value={scriptDuration} onChange={e => setScriptDuration(Number(e.target.value))} className="w-full accent-purple-600 h-1" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '画面比例' : 'Aspect Ratio'}</label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {(['16:9', '4:3', '9:16', '1:1', '21:9', '4:5', '3:2'] as AspectRatio[]).map(ratio => (
-                            <button
-                              key={ratio}
-                              onClick={() => setScriptAspectRatio(ratio)}
-                              className={`px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
-                                scriptAspectRatio === ratio
-                                  ? 'bg-purple-600 text-white'
-                                  : theme === 'dark'
-                                  ? 'bg-white/5 border border-white/10 text-zinc-400 hover:border-purple-500/50'
-                                  : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:border-purple-500'
+                    </div>
+                  </div>
+                </section>
+
+                {/* Symbol Library Section - Draggable symbols organized by category */}
+                <section className="space-y-3 pt-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest opacity-50">{lang === 'zh' ? '符号库' : 'Symbol Library'}</h3>
+                  <div className={`p-4 rounded-2xl border space-y-4 ${theme === 'dark' ? 'bg-purple-500/10 border-purple-500/30' : 'bg-purple-50 border-purple-200'}`}>
+                    <p className={`text-[10px] font-bold ${theme === 'dark' ? 'text-purple-300' : 'text-purple-700'}`}>
+                      {lang === 'zh' 
+                        ? '💡 拖动符号到分镜图片上，自动添加到视频提示词' 
+                        : '💡 Drag symbols onto frames to add them to video prompts'}
+                    </p>
+
+                    {/* Camera Motion Symbols */}
+                    <div className="space-y-2">
+                      <div className={`text-[10px] font-black uppercase opacity-50 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-700'}`}>
+                        {lang === 'zh' ? '📹 镜头运动' : '📹 Camera Motion'}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['pan-left', 'pan-right', 'tilt-up', 'tilt-down', 'zoom-in', 'zoom-out', 'hitchcock', 'pov-shot'].map((symbolName) => {
+                          const descriptions = symbolDescriptions || {};
+                          const langDescriptions = descriptions[lang] || descriptions['en'] || {};
+                          const description = langDescriptions[symbolName] || symbolName;
+                          const label = SYMBOL_LABELS[symbolName];
+                          
+                          return (
+                            <div
+                              key={symbolName}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer!.effectAllowed = 'copy';
+                                e.dataTransfer!.setData('symbolName', symbolName);
+                              }}
+                              className={`p-2 rounded-lg text-lg font-bold cursor-move transition-all hover:scale-110 flex items-center justify-center ${
+                                theme === 'dark'
+                                  ? 'bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30'
+                                  : 'bg-purple-100 border border-purple-300 hover:bg-purple-200'
                               }`}
+                              title={description}
                             >
-                              {ratio}
-                            </button>
-                          ))}
-                        </div>
+                              {label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Action Motion Symbols */}
+                    <div className="space-y-2">
+                      <div className={`text-[10px] font-black uppercase opacity-50 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-700'}`}>
+                        {lang === 'zh' ? '🎬 动作运动' : '🎬 Action Motion'}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {['action-forward', 'action-rotate', 'action-jump', 'action-fly'].map((symbolName) => {
+                          const descriptions = symbolDescriptions || {};
+                          const langDescriptions = descriptions[lang] || descriptions['en'] || {};
+                          const description = langDescriptions[symbolName] || symbolName;
+                          const label = SYMBOL_LABELS[symbolName];
+                          
+                          return (
+                            <div
+                              key={symbolName}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer!.effectAllowed = 'copy';
+                                e.dataTransfer!.setData('symbolName', symbolName);
+                              }}
+                              className={`p-2 rounded-lg text-lg font-bold cursor-move transition-all hover:scale-110 flex items-center justify-center ${
+                                theme === 'dark'
+                                  ? 'bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30'
+                                  : 'bg-purple-100 border border-purple-300 hover:bg-purple-200'
+                              }`}
+                              title={description}
+                            >
+                              {label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Quick Generation Symbols */}
+                    <div className="space-y-2">
+                      <div className={`text-[10px] font-black uppercase opacity-50 ${theme === 'dark' ? 'text-purple-300' : 'text-purple-700'}`}>
+                        {lang === 'zh' ? '⚡ 快速生成' : '⚡ Quick Generate'}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['quick-three-view', 'quick-multi-grid', 'quick-style-comparison', 'quick-narrative-progression'].map((symbolName) => {
+                          const descriptions = symbolDescriptions || {};
+                          const langDescriptions = descriptions[lang] || descriptions['en'] || {};
+                          const description = langDescriptions[symbolName] || symbolName;
+                          const label = SYMBOL_LABELS[symbolName];
+                          
+                          return (
+                            <div
+                              key={symbolName}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer!.effectAllowed = 'copy';
+                                e.dataTransfer!.setData('symbolName', symbolName);
+                              }}
+                              className={`p-2 rounded-lg text-sm font-bold cursor-move transition-all hover:scale-105 flex items-center justify-center gap-1 ${
+                                theme === 'dark'
+                                  ? 'bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30'
+                                  : 'bg-purple-100 border border-purple-300 hover:bg-purple-200'
+                              }`}
+                              title={description}
+                            >
+                              <span>{label}</span>
+                              <span className="text-[10px]">{lang === 'zh' ? description.split('(')[0].trim() : description}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
-                  
-                  <textarea 
-                    value={scriptInput} 
-                    onChange={e => setScriptInput(e.target.value)} 
-                    placeholder={t.inputPlaceholder} 
-                    className={`w-full h-40 rounded-[2rem] p-6 text-sm font-bold border-2 border-purple-500 outline-none transition-all focus:border-purple-600 focus:shadow-lg focus:shadow-purple-500/30 ${theme === 'dark' ? 'bg-white/5' : 'bg-zinc-50 text-black'}`} 
-                  />
-                  <button 
-                    onClick={() => onGenerateFromScript(scriptInput, frameCount, scriptStyle || undefined, scriptAspectRatio, scriptDuration)} 
-                    disabled={isLoading}
-                    title={lang === 'zh' ? '根据剧本生成分镜' : 'Generate frames from script'}
-                    className="w-full py-5 bg-purple-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    {isLoading ? t.loading : t.generate}
-                  </button>
                 </section>
-
 
                 <section className="space-y-4 pt-4">
                   <button 
@@ -524,21 +598,6 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   </button>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => { 
-                        const prompts = getFormattedPrompts();
-                        // 根据当前语言显示对应版本
-                        const currentLang = lang === 'zh' ? 'zh' : 'en';
-                        const content = typeof prompts === 'string' ? prompts : (prompts as any)[currentLang] || '';
-                        setEditablePrompts(content); 
-                        setPreviewLang(currentLang);
-                        setShowPreviewModal(true); 
-                      }} 
-                      title={lang === 'zh' ? '预览并编辑导出的提示词' : 'Preview and edit export prompts'}
-                      className={`flex-1 py-4 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all ${theme === 'dark' ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
-                    >
-                      {t.previewPrompts}
-                    </button>
-                    <button 
                       onClick={() => onExportPrompts()} 
                       title={lang === 'zh' ? '下载提示词为文本文件' : 'Download prompts as text file'}
                       className={`flex-1 py-4 font-black uppercase text-[10px] tracking-widest rounded-xl transition-all ${theme === 'dark' ? 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
@@ -548,76 +607,74 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   </div>
                 </section>
               </div>
-            ) : activeTab === 'chat' ? (
+            ) : activeTab === 'scriptCreation' ? (
               <div className="h-full flex flex-col gap-0 overflow-hidden">
                 <div className="space-y-2 p-4 border-b flex-shrink-0" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#e5e7eb' }}>
                   <h3 className="text-xs font-black uppercase tracking-widest opacity-50">{lang === 'zh' ? '生成配置' : 'Generation Config'}</h3>
+                  
+                  {/* Style Selection */}
                   <div className="space-y-2">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-black uppercase opacity-50">
-                        <span>{t.frameCount}</span>
-                        <span>{chatFrameCount}</span>
-                      </div>
-                      <input type="range" min="1" max="16" value={chatFrameCount} onChange={e => setChatFrameCount(Number(e.target.value))} className="w-full accent-purple-600 h-1" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-black uppercase opacity-50">
-                        <span>{lang === 'zh' ? '时长' : 'Duration'}</span>
-                        <span>{chatDuration}s</span>
-                      </div>
-                      <input type="range" min="5" max="120" step="5" value={chatDuration} onChange={e => setChatDuration(Number(e.target.value))} className="w-full accent-purple-600 h-1" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '风格' : 'Style'}</label>
-                      {chatStyle && <StyleSelector selectedStyle={chatStyle} onStyleChange={setChatStyle} lang={lang} theme={theme} />}
-                      {!chatStyle && (
-                        <button
-                          onClick={() => setChatStyle(STYLES[0])}
-                          className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold transition-all ${
-                            theme === 'dark'
-                              ? 'bg-white/5 border-white/10 text-white/50 hover:border-purple-500/50'
-                              : 'bg-zinc-50 border-zinc-300 text-zinc-500 hover:border-purple-500'
-                          }`}
-                        >
-                          {lang === 'zh' ? '选择风格...' : 'Select Style...'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '画面比例' : 'Aspect Ratio'}</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {(['16:9', '4:3', '9:16', '1:1', '21:9', '4:5', '3:2'] as AspectRatio[]).map(ratio => (
-                          <button
-                            key={ratio}
-                            onClick={() => setChatAspectRatio(ratio)}
-                            className={`px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
-                              chatAspectRatio === ratio
-                                ? 'bg-purple-600 text-white'
-                                : theme === 'dark'
-                                ? 'bg-white/5 border border-white/10 text-zinc-400 hover:border-purple-500/50'
-                                : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:border-purple-500'
-                            }`}
-                          >
-                            {ratio}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setIsHelpMode(!isHelpMode)}
-                      title={lang === 'zh' ? '不会使用，点击"智慧客服"向我提问' : 'Don\'t know how to use? Click "Smart Service" to ask me'}
-                      className={`w-full py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${
-                        isHelpMode
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
-                          : theme === 'dark'
-                          ? 'bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 hover:border-blue-500/50'
-                          : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:bg-blue-50 hover:border-blue-500'
-                      }`}
-                    >
-                      {isHelpMode ? '📚 ' : '📖 '}{lang === 'zh' ? '智慧客服' : 'Smart Service'}
-                    </button>
+                    <label className="text-xs font-black uppercase opacity-50">{lang === 'zh' ? '风格' : 'Style'}</label>
+                    {chatStyle && <StyleSelector selectedStyle={chatStyle} onStyleChange={handleChatStyleChange} lang={lang} theme={theme} />}
+                    {!chatStyle && (
+                      <button
+                        onClick={() => handleChatStyleChange(STYLES[0])}
+                        className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold transition-all ${
+                          theme === 'dark'
+                            ? 'bg-white/5 border-white/10 text-white/50 hover:border-purple-500/50'
+                            : 'bg-zinc-50 border-zinc-300 text-zinc-500 hover:border-purple-500'
+                        }`}
+                      >
+                        {lang === 'zh' ? '选择风格...' : 'Select Style...'}
+                      </button>
+                    )}
                   </div>
+
+                  {/* Aspect Ratio */}
+                  <h3 className="text-xs font-black uppercase tracking-widest opacity-50 mt-3">{lang === 'zh' ? '画面比例' : 'Aspect Ratio'}</h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['16:9', '4:3', '9:16', '1:1', '21:9', '4:5', '3:2'] as AspectRatio[]).map(ratio => (
+                      <button
+                        key={ratio}
+                        onClick={() => setChatAspectRatio(ratio)}
+                        className={`px-2 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                          chatAspectRatio === ratio
+                            ? 'bg-purple-600 text-white'
+                            : theme === 'dark'
+                            ? 'bg-white/5 border border-white/10 text-zinc-400 hover:border-purple-500/50'
+                            : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:border-purple-500'
+                        }`}
+                      >
+                        {ratio}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setIsHelpMode(!isHelpMode)}
+                    title={lang === 'zh' ? '不会使用，点击"智慧客服"向我提问' : 'Don\'t know how to use? Click "Smart Service" to ask me'}
+                    className={`w-full py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all mt-3 ${
+                      isHelpMode
+                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
+                        : theme === 'dark'
+                        ? 'bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 hover:border-blue-500/50'
+                        : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:bg-blue-50 hover:border-blue-500'
+                    }`}
+                  >
+                    {isHelpMode ? '📚 ' : '📖 '}{lang === 'zh' ? '智慧客服' : 'Smart Service'}
+                  </button>
+
+                  <button 
+                    onClick={onOpenHelp}
+                    className={`w-full py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all ${
+                      theme === 'dark'
+                        ? 'bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10 hover:border-purple-500/50'
+                        : 'bg-zinc-50 border border-zinc-300 text-zinc-600 hover:bg-purple-50 hover:border-purple-500'
+                    }`}
+                    title={lang === 'zh' ? '查看完整使用说明' : 'View complete guide'}
+                  >
+                    📖 {lang === 'zh' ? '使用说明' : 'Guide'}
+                  </button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto space-y-3 px-4 py-2 no-scrollbar min-h-0">
@@ -770,21 +827,6 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                           }}
                           className="hidden"
                         />
-                        {/* 截图按钮 */}
-                        <button 
-                          onClick={handleScreenshot}
-                          disabled={isChatLoading || attachedImage.isLoading}
-                          title={lang === 'zh' ? '截图当前页面' : 'Screenshot current page'}
-                          className={`w-6 h-6 flex items-center justify-center text-lg transition-all hover:scale-110 ${
-                            attachedImage.isLoading
-                              ? 'text-orange-500 animate-pulse'
-                              : theme === 'dark'
-                              ? 'text-gray-400 hover:text-gray-300'
-                              : 'text-gray-600 hover:text-gray-700'
-                          } ${(isChatLoading || attachedImage.isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          📸
-                        </button>
                         {/* 图片上传按钮 */}
                         <button 
                           onClick={() => document.getElementById('chat-image-input')?.click()}
@@ -845,14 +887,24 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                     </div>
                   )}
                 </div>
-                <button 
-                  onClick={() => handleGenerateStoryboard()} 
-                  disabled={isLoading || chatHistory.length === 0}
-                  title={lang === 'zh' ? '根据对话内容生成分镜' : 'Generate storyboard from dialogue'}
-                  className="mx-4 mb-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm flex-shrink-0"
-                >
-                  {isLoading ? (lang === 'zh' ? '生成中...' : 'Generating...') : (lang === 'zh' ? '生成分镜' : 'Generate Storyboard')}
-                </button>
+                <div className="flex gap-2 px-4 pb-4 flex-shrink-0">
+                  <button 
+                    onClick={() => handleGenerateStoryboard()} 
+                    disabled={isLoading || chatHistory.length === 0}
+                    title={lang === 'zh' ? '预览生成的脚本' : 'Preview generated script'}
+                    className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm"
+                  >
+                    {isLoading ? (lang === 'zh' ? '预览中...' : 'Previewing...') : (lang === 'zh' ? '👁️ 预览脚本' : '👁️ Preview Script')}
+                  </button>
+                  <button 
+                    onClick={() => handleGenerateStoryboard()} 
+                    disabled={isLoading || chatHistory.length === 0}
+                    title={lang === 'zh' ? '根据对话内容生成脚本' : 'Generate script from dialogue'}
+                    className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm"
+                  >
+                    {isLoading ? (lang === 'zh' ? '生成中...' : 'Generating...') : (lang === 'zh' ? '生成脚本' : 'Generate')}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -888,86 +940,6 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       >
         {isExpanded ? '→' : '←'}
       </button>
-
-      {/* Preview Modal */}
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
-          <div className={`max-w-4xl w-full h-[80vh] rounded-[3rem] p-12 border flex flex-col shadow-2xl animate-in zoom-in-95 ${theme === 'dark' ? 'bg-zinc-900 border-white/10' : 'bg-white border-zinc-200'}`}>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className={`text-2xl font-black uppercase tracking-widest ${theme === 'dark' ? 'text-white' : 'text-black'}`}>{t.exportPreviewTitle}</h3>
-              <button onClick={() => setShowPreviewModal(false)} className={`transition-colors ${theme === 'dark' ? 'text-zinc-500 hover:text-white' : 'text-zinc-500 hover:text-black'}`}>✕</button>
-            </div>
-            
-            {/* Language Toggle */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => {
-                  setPreviewLang('zh');
-                  const prompts = getFormattedPrompts();
-                  // 如果是对象，取中文版本；如果是字符串，直接使用
-                  const content = typeof prompts === 'object' && prompts !== null ? (prompts as any).zh || '' : prompts;
-                  setEditablePrompts(content);
-                }}
-                className={`px-4 py-2 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${
-                  previewLang === 'zh'
-                    ? 'bg-purple-600 text-white'
-                    : theme === 'dark'
-                    ? 'bg-white/5 border border-white/10 text-zinc-400 hover:border-purple-500/50'
-                    : 'bg-zinc-100 border border-zinc-300 text-zinc-600 hover:border-purple-500'
-                }`}
-              >
-                中文
-              </button>
-              <button
-                onClick={() => {
-                  setPreviewLang('en');
-                  const prompts = getFormattedPrompts();
-                  // 如果是对象，取英文版本；如果是字符串，直接使用
-                  const content = typeof prompts === 'object' && prompts !== null ? (prompts as any).en || '' : prompts;
-                  setEditablePrompts(content);
-                }}
-                className={`px-4 py-2 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${
-                  previewLang === 'en'
-                    ? 'bg-purple-600 text-white'
-                    : theme === 'dark'
-                    ? 'bg-white/5 border border-white/10 text-zinc-400 hover:border-purple-500/50'
-                    : 'bg-zinc-100 border border-zinc-300 text-zinc-600 hover:border-purple-500'
-                }`}
-              >
-                English
-              </button>
-            </div>
-            
-            <textarea value={editablePrompts} onChange={e => setEditablePrompts(e.target.value)} className={`flex-1 w-full rounded-2xl p-6 text-sm font-bold border bg-transparent outline-none focus:border-purple-500/50 resize-none ${theme === 'dark' ? 'border-white/5 text-white' : 'border-zinc-200 text-black'}`} />
-            <div className="mt-8 flex gap-4">
-              <button 
-                onClick={() => setShowPreviewModal(false)} 
-                title={lang === 'zh' ? '关闭预览' : 'Close preview'}
-                className={`flex-1 py-4 border rounded-2xl uppercase font-black transition-all ${theme === 'dark' ? 'border-zinc-500 text-zinc-500 hover:bg-zinc-500 hover:text-white' : 'border-zinc-400 text-zinc-600 hover:bg-zinc-200 hover:text-black'}`}
-              >
-                {lang === 'zh' ? '取消' : 'Cancel'}
-              </button>
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText(editablePrompts);
-                  alert(lang === 'zh' ? '已复制到剪贴板' : 'Copied to clipboard');
-                }} 
-                title={lang === 'zh' ? '复制提示词到剪贴板' : 'Copy prompts to clipboard'}
-                className={`flex-1 py-4 border-2 rounded-2xl uppercase font-black transition-all ${theme === 'dark' ? 'border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white' : 'border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
-              >
-                {lang === 'zh' ? '📋 复制' : '📋 Copy'}
-              </button>
-              <button 
-                onClick={() => { onExportPrompts(editablePrompts); setShowPreviewModal(false); }} 
-                title={lang === 'zh' ? '下载编辑后的提示词' : 'Download edited prompts'}
-                className="flex-1 py-4 bg-purple-600 text-white rounded-2xl uppercase font-black shadow-xl hover:scale-[1.02] transition-all"
-              >
-                {lang === 'zh' ? '📥 下载' : '📥 Download'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Model selector - removed */}
 
