@@ -26,13 +26,14 @@ interface SidebarRightProps {
   onStyleChange?: (style: StyleOption | null) => void;
   onAspectRatioChange?: (ratio: AspectRatio | null) => void;
   onGenerateVideo?: () => void;
+  onOpenManualSceneDialog?: () => void;
   selectedCount?: number;
   currentSymbols?: Array<{ name: string }>;
   symbolDescriptions?: Record<string, Record<string, string>>;
 }
 
 const SidebarRight: React.FC<SidebarRightProps> = ({ 
-  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, onGenerateScriptPreview, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, selectedCount, currentSymbols = [], symbolDescriptions = {}
+  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, onGenerateScriptPreview, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, onOpenManualSceneDialog, selectedCount, currentSymbols = [], symbolDescriptions = {}
 }) => {
   const [activeTab, setActiveTab] = useState<'scriptCreation' | 'videoEdit'>('scriptCreation');
   const [chatInput, setChatInput] = useState('');
@@ -903,20 +904,12 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                 </div>
                 <div className="flex gap-2 px-4 pb-4 flex-shrink-0">
                   <button 
-                    onClick={() => handleGenerateStoryboard()} 
-                    disabled={isLoading || chatHistory.length === 0}
-                    title={lang === 'zh' ? '预览生成的脚本' : 'Preview generated script'}
-                    className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm"
-                  >
-                    {isLoading ? (lang === 'zh' ? '预览中...' : 'Previewing...') : (lang === 'zh' ? '👁️ 预览脚本' : '👁️ Preview Script')}
-                  </button>
-                  <button 
-                    onClick={() => handleGenerateStoryboard()} 
-                    disabled={isLoading || chatHistory.length === 0}
-                    title={lang === 'zh' ? '根据对话内容生成脚本' : 'Generate script from dialogue'}
+                    onClick={() => onOpenManualSceneDialog?.()} 
+                    disabled={isLoading}
+                    title={lang === 'zh' ? '打开画面输入对话框' : 'Open scene input dialog'}
                     className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm"
                   >
-                    {isLoading ? (lang === 'zh' ? '生成中...' : 'Generating...') : (lang === 'zh' ? '生成脚本' : 'Generate')}
+                    {isLoading ? (lang === 'zh' ? '生成中...' : 'Generating...') : (lang === 'zh' ? '🎬 生成画面' : '🎬 Generate Scenes')}
                   </button>
                 </div>
               </div>

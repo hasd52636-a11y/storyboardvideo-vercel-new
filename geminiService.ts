@@ -23,6 +23,121 @@ const isPlaceholder = (text: string): boolean => {
   return /^#+\s*(画面|Scene|scene)\s*\d+\s*$/.test(text.trim());
 };
 
+// ✅ 提取自定义格式的场景 - 支持简化的 <<< >>> 标记格式
+export const extractScenesBySimpleMarker = (text: string): ScriptScene[] => {
+  console.log('[extractScenesBySimpleMarker] 开始提取场景...');
+  console.log('[extractScenesBySimpleMarker] 输入文本长度:', text.length);
+  
+  // 使用简单的 <<< >>> 标记
+  const scenePattern = /<<<(.*?)>>>/gs;
+  const scenes: ScriptScene[] = [];
+  
+  let match;
+  let index = 0;
+  
+  while ((match = scenePattern.exec(text)) !== null) {
+    const content = match[1].trim();
+    
+    // 跳过空场景
+    if (content.length === 0) {
+      console.warn(`[extractScenesBySimpleMarker] 跳过空场景`);
+      continue;
+    }
+    
+    console.log(`[extractScenesBySimpleMarker] ✅ 提取场景 ${index + 1}`);
+    console.log(`[extractScenesBySimpleMarker]   内容长度: ${content.length} 字符`);
+    console.log(`[extractScenesBySimpleMarker]   内容预览: ${content.substring(0, 50)}...`);
+    
+    scenes.push({
+      index,
+      description: content,
+      visualPrompt: content,
+      videoPrompt: '',
+      videoPromptEn: ''
+    });
+    
+    index++;
+  }
+  
+  console.log(`[extractScenesBySimpleMarker] ✅ 总共提取 ${scenes.length} 个场景`);
+  return scenes;
+};
+
+// ✅ 提取双标记格式的场景 - 分别提取画面提示词和视频提示词
+export const extractScenesWithDualMarkers = (text: string): ScriptScene[] => {
+  console.log('[extractScenesWithDualMarkers] 开始提取场景...');
+  console.log('[extractScenesWithDualMarkers] 输入文本长度:', text.length);
+  
+  // 提取画面提示词：<<< ... >>>
+  const visualPattern = /<<<(.*?)>>>/gs;
+  // 提取视频提示词：{{{ ... }}}
+  const videoPattern = /\{\{\{(.*?)\}\}\}/gs;
+  
+  const visualPrompts: string[] = [];
+  const videoPrompts: string[] = [];
+  
+  // 第一步：提取所有画面提示词
+  let visualMatch;
+  let visualIndex = 0;
+  
+  while ((visualMatch = visualPattern.exec(text)) !== null) {
+    const content = visualMatch[1].trim();
+    
+    if (content.length === 0) {
+      console.warn(`[extractScenesWithDualMarkers] 跳过空的画面提示词`);
+      continue;
+    }
+    
+    console.log(`[extractScenesWithDualMarkers] ✅ 提取画面提示词 ${visualIndex + 1}`);
+    console.log(`[extractScenesWithDualMarkers]   长度: ${content.length} 字符`);
+    
+    visualPrompts.push(content);
+    visualIndex++;
+  }
+  
+  // 第二步：提取所有视频提示词
+  let videoMatch;
+  let videoIndex = 0;
+  
+  while ((videoMatch = videoPattern.exec(text)) !== null) {
+    const content = videoMatch[1].trim();
+    
+    if (content.length === 0) {
+      console.warn(`[extractScenesWithDualMarkers] 跳过空的视频提示词`);
+      continue;
+    }
+    
+    console.log(`[extractScenesWithDualMarkers] ✅ 提取视频提示词 ${videoIndex + 1}`);
+    console.log(`[extractScenesWithDualMarkers]   长度: ${content.length} 字符`);
+    
+    videoPrompts.push(content);
+    videoIndex++;
+  }
+  
+  // 第三步：配对画面和视频提示词
+  const sceneCount = Math.max(visualPrompts.length, videoPrompts.length);
+  const scenes: ScriptScene[] = [];
+  
+  for (let i = 0; i < sceneCount; i++) {
+    scenes.push({
+      index: i,
+      description: visualPrompts[i] || '',
+      visualPrompt: visualPrompts[i] || '',
+      videoPrompt: videoPrompts[i] || '',
+      videoPromptEn: ''
+    });
+  }
+  
+  console.log(`[extractScenesWithDualMarkers] ✅ 总共提取 ${scenes.length} 个场景`);
+  console.log(`[extractScenesWithDualMarkers]   画面提示词: ${visualPrompts.length} 个`);
+  console.log(`[extractScenesWithDualMarkers]   视频提示词: ${videoPrompts.length} 个`);
+  
+  return scenes;
+};
+
+// ✅ 向后兼容：保留旧的提取函数名称
+export const extractScenesByCustomMarker = extractScenesBySimpleMarker;
+
 // ✅ 步骤1：生成视频提示词 - 基于两个连续场景的画面提示词生成过渡视频提示词
 export const generateVideoPromptFromVisual = async (
   visualPrompt: string,
@@ -1138,8 +1253,8 @@ const extractPromptContent = (text: string, type: 'visual' | 'video'): string =>
   // Remove leading/trailing quotes and colons only if they're not part of the content
   content = content.replace(/^[\s"':]+|[\s"':]+$/g, '').trim();
   
-  // If result is too short or empty, return empty string
-  if (content.length < 10) {
+  // 只对 video 类型的提示词应用最小长度检查，visual 提示词保留
+  if (type === 'video' && content.length < 10) {
     return '';
   }
   

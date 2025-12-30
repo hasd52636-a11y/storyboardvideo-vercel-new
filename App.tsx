@@ -16,6 +16,7 @@ import VideoService from './videoService';
 import { CloneWorkflowManager, CloneWorkflowState } from './services/CloneWorkflowManager';
 import PromptReviewDialog from './components/PromptReviewDialog';
 import StoryboardPreviewDialog from './components/StoryboardPreviewDialog';
+import ManualSceneInputDialog from './components/ManualSceneInputDialog';
 
 interface HelpSection {
   title: string;
@@ -115,6 +116,10 @@ const App: React.FC = () => {
     imageUrl?: string;
     index: number;
   }>>([]);
+
+  // Manual Scene Input Dialog State
+  const [showManualSceneDialog, setShowManualSceneDialog] = useState(false);
+  const [manualSceneBatchInterval, setManualSceneBatchInterval] = useState(2000);
 
   const t = I18N[lang];
 
@@ -660,6 +665,144 @@ const App: React.FC = () => {
       
     } catch (e) {
       console.error("Failed to generate from dialogue", e);
+      const msg = lang === 'zh'
+        ? `生成失败: ${e}`
+        : `Generation failed: ${e}`;
+      alert(msg);
+    }
+  }, [items.length, canvasOffset, globalColorMode, lang]);
+
+  // Handle manual scene generation from ManualSceneInputDialog
+  const handleGenerateFromManualScenes = useCallback(async (scenes: any[], batchInterval?: number) => {
+    if (!scenes || scenes.length === 0) return;
+    
+    try {
+      const startOrder = items.length;
+      const isBlackAndWhite = globalColorMode === 'blackAndWhite';
+      
+      // Get style and aspect ratio from SidebarRight (chatStyle and chatAspectRatio)
+      // These are passed through props to SidebarRight
+      const { STYLES, calculateHeight } = await import('./types');
+      const baseWidth = 380;
+      
+      // 第一步：创建占位符卡片（黑色预览）
+      const placeholderItems: StoryboardItem[] = [];
+      const sceneIndexMap: Map<string, number> = new Map();
+      
+      for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i];
+        const sceneNum = `SC-${String(i + 1).padStart(2, '0')}`;
+        
+        // 清理提示词
+        let cleanedPrompt = scene.visualPrompt || '';
+        cleanedPrompt = cleanedPrompt
+          .replace(/【[^】]*】/g, '')
+          .replace(/（[^）]*）/g, '')
+          .replace(/\([^)]*\)/g, '')
+          .replace(/\[[^\]]*\]/g, '')
+          .replace(/###\s*(画面|Scene|scene)\s*\d+/gi, '')
+          .replace(/全文\d+字/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (!cleanedPrompt) {
+          showCanvasNotification(
+            `placeholder_${i}`,
+            lang === 'zh' ? `⚠️ 场景 ${i + 1} 提示词无效` : `⚠️ Scene ${i + 1} invalid prompt`,
+            'error'
+          );
+          continue;
+        }
+        
+        // Build enriched prompt
+        let enrichedPrompt = `【${sceneNum}】
+【视觉提示】: ${cleanedPrompt}`;
+        
+        // 创建占位符卡片
+        const placeholderId = crypto.randomUUID();
+        const height = calculateHeight(baseWidth, '16:9');
+        const placeholderItem: StoryboardItem = {
+          id: placeholderId,
+          imageUrl: '',
+          prompt: enrichedPrompt,
+          description: cleanedPrompt,
+          x: (i % 4) * 440 + 100 - canvasOffset.x,
+          y: Math.floor(i / 4) * 280 + 100 - canvasOffset.y,
+          width: baseWidth,
+          height,
+          isMain: false,
+          filter: FilterMode.LINE_ART,
+          order: startOrder + i,
+          symbols: [],
+          colorMode: isBlackAndWhite ? 'blackAndWhite' : 'color',
+          aspectRatio: '16:9',
+          visualPrompt: cleanedPrompt,
+          videoPrompt: scene.videoPrompt || '',
+          isLoading: true
+        };
+        
+        placeholderItems.push(placeholderItem);
+        sceneIndexMap.set(placeholderId, i);
+      }
+      
+      // 立即添加所有占位符到画布
+      setItems(prev => [...prev, ...placeholderItems]);
+      
+      // 第二步：异步生成每个场景的图片，使用间隔时间
+      placeholderItems.forEach((placeholderItem, idx) => {
+        const sceneIndex = sceneIndexMap.get(placeholderItem.id)!;
+        const delay = (batchInterval || 0) * idx;
+        
+        setTimeout(async () => {
+          try {
+            console.log(`[handleGenerateFromManualScenes] Generating image for scene ${sceneIndex + 1}/${scenes.length}`);
+            
+            const imageUrl = await generateSceneImage(
+              placeholderItem.prompt,
+              true,
+              isBlackAndWhite,
+              undefined,
+              '16:9'
+            );
+            
+            if (imageUrl) {
+              // 更新卡片 - 保留视频提示词
+              setItems(prev => prev.map(item =>
+                item.id === placeholderItem.id
+                  ? {
+                      ...item,
+                      imageUrl,
+                      videoPrompt: placeholderItem.videoPrompt,
+                      isLoading: false
+                    }
+                  : item
+              ));
+              
+              // 显示成功提示
+              showCanvasNotification(
+                placeholderItem.id,
+                lang === 'zh' ? `✅ 场景 ${sceneIndex + 1} 生成成功` : `✅ Scene ${sceneIndex + 1} generated`,
+                'success'
+              );
+            } else {
+              throw new Error('No image URL returned');
+            }
+          } catch (error) {
+            console.error(`[handleGenerateFromManualScenes] Failed to generate image for scene ${sceneIndex + 1}:`, error);
+            
+            showCanvasNotification(
+              placeholderItem.id,
+              lang === 'zh' 
+                ? `❌ 场景 ${sceneIndex + 1} 生成失败` 
+                : `❌ Scene ${sceneIndex + 1} failed`,
+              'error'
+            );
+          }
+        }, delay);
+      });
+      
+    } catch (e) {
+      console.error("Failed to generate from manual scenes", e);
       const msg = lang === 'zh'
         ? `生成失败: ${e}`
         : `Generation failed: ${e}`;
@@ -2942,6 +3085,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         onStyleChange={setVideoEditStyle}
         onAspectRatioChange={setCurrentAspectRatio}
         onGenerateVideo={() => setShowVideoGenDialog(true)}
+        onOpenManualSceneDialog={() => setShowManualSceneDialog(true)}
         selectedCount={selectedIds.size}
         currentSymbols={getAllSelectedSymbols()}
         symbolDescriptions={SYMBOL_DESCRIPTIONS} />
@@ -3280,6 +3424,23 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           onCancel={() => setShowStoryboardPreviewDialog(false)}
         />
       )}
+
+      {/* Manual Scene Input Dialog */}
+      <ManualSceneInputDialog
+        isOpen={showManualSceneDialog}
+        onClose={() => setShowManualSceneDialog(false)}
+        onConfirm={(scenes) => {
+          // Save scenes to state if needed
+          console.log('Scenes confirmed:', scenes);
+        }}
+        onGenerate={handleGenerateFromManualScenes}
+        lang={lang}
+        theme={theme}
+        onMinimize={(isMinimized) => {
+          // Handle minimize event if needed
+          console.log('Dialog minimized:', isMinimized);
+        }}
+      />
     </div>
   );
 };
