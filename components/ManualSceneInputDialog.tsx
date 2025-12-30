@@ -174,10 +174,12 @@ Scene 3 video prompt`;
 
         if (parsedScenes.length > 0) {
           setScenes(parsedScenes);
+          // 自动切换到单个模式显示导入的场景
           setIsBatchMode(false);
+          setBatchInput(''); // 清空批量输入框
           alert(lang === 'zh' 
-            ? `成功导入 ${parsedScenes.length} 个场景` 
-            : `Successfully imported ${parsedScenes.length} scenes`);
+            ? `成功导入 ${parsedScenes.length} 个场景，已切换到单个编辑模式` 
+            : `Successfully imported ${parsedScenes.length} scenes, switched to single edit mode`);
         }
       }
     };
@@ -209,10 +211,12 @@ Scene 3 video prompt`;
     }
 
     setScenes(parsedScenes);
+    // 自动切换到单个模式，显示导入的场景
     setIsBatchMode(false);
+    setBatchInput(''); // 清空批量输入框
     alert(lang === 'zh' 
-      ? `成功解析 ${parsedScenes.length} 个场景` 
-      : `Successfully parsed ${parsedScenes.length} scenes`);
+      ? `成功解析 ${parsedScenes.length} 个场景，已切换到单个编辑模式` 
+      : `Successfully parsed ${parsedScenes.length} scenes, switched to single edit mode`);
   };
 
   const handleConfirm = () => {
@@ -600,8 +604,29 @@ Scene 3 video prompt`;
                 {labels.parseBatch}
               </button>
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || scenes.length === 0}
+                onClick={() => {
+                  // 直接生成，不切换模式
+                  const sceneRegex = /<<<([\s\S]*?)>>>/g;
+                  const matches = Array.from(batchInput.matchAll(sceneRegex));
+                  
+                  if (matches.length === 0) {
+                    alert(lang === 'zh' ? '未找到有效的场景标记' : 'No valid scene markers found');
+                    return;
+                  }
+
+                  const parsedScenes: Scene[] = matches.map((match, index) => ({
+                    id: String(index + 1),
+                    visualPrompt: match[1].trim()
+                  })).filter(scene => scene.visualPrompt.length > 0);
+
+                  if (parsedScenes.length === 0) {
+                    alert(lang === 'zh' ? '未找到有效的场景内容' : 'No valid scene content found');
+                    return;
+                  }
+
+                  onGenerate(parsedScenes, batchInterval);
+                }}
+                disabled={isGenerating || !batchInput.trim()}
                 className={`px-4 py-2 rounded font-medium transition-colors ${
                   theme === 'dark'
                     ? 'bg-green-600 hover:bg-green-700 text-white disabled:opacity-50'
