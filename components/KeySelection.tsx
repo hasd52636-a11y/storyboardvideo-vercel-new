@@ -73,6 +73,12 @@ const IMAGE_PROVIDERS = [
 
 const VIDEO_PROVIDERS = [
   {
+    id: 'zhipu',
+    name: '智谱 GLM (推荐)',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    docUrl: 'https://open.bigmodel.cn/usercenter/apikeys'
+  },
+  {
     id: 'shenma',
     name: '神马 (官方)',
     baseUrl: 'https://api.whatai.cc/',
@@ -136,14 +142,28 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
     if (saved) setConfig(JSON.parse(saved));
     
     const videoSaved = localStorage.getItem('director_canvas_video_config');
-    if (videoSaved) setVideoConfig(JSON.parse(videoSaved));
+    if (videoSaved) {
+      const parsed = JSON.parse(videoSaved);
+      // Normalize provider ID to match VideoAPIProvider type
+      const normalizedProvider = parsed.provider === 'dayangyu' ? 'dyu' : parsed.provider;
+      setVideoConfig({
+        ...parsed,
+        provider: normalizedProvider
+      });
+    }
   }, []);
 
   const handleSave = () => {
     localStorage.setItem('director_canvas_api_config', JSON.stringify(config));
     
     if (videoConfig.baseUrl && videoConfig.apiKey) {
-      localStorage.setItem('director_canvas_video_config', JSON.stringify(videoConfig));
+      // Normalize provider ID to match VideoAPIProvider type
+      const normalizedProvider = videoConfig.provider === 'dayangyu' ? 'dyu' : videoConfig.provider;
+      const normalizedVideoConfig = {
+        ...videoConfig,
+        provider: normalizedProvider
+      };
+      localStorage.setItem('director_canvas_video_config', JSON.stringify(normalizedVideoConfig));
     }
     
     if (onLangChange && selectedLang !== lang) {
@@ -186,42 +206,22 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
 
     setVideoTestStatus('loading');
     try {
-      // 首先尝试测试令牌配额端点
       const baseUrl = videoConfig.baseUrl.replace(/\/$/, '');
-      const tokenQueryUrl = `${baseUrl}/v1/token/quota`;
+      const isZhipu = baseUrl.includes('bigmodel.cn');
       
-      console.log('[testVideoConnection] Testing token quota endpoint:', tokenQueryUrl);
-      
-      const response = await fetch(tokenQueryUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${videoConfig.apiKey}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[testVideoConnection] Token quota response:', data);
-        setVideoTestStatus('success');
-        setTimeout(() => setVideoTestStatus('idle'), 3000);
-      } else if (response.status === 401) {
-        console.error('[testVideoConnection] Authentication failed (401)');
-        setVideoTestStatus('failed');
-        setTimeout(() => setVideoTestStatus('idle'), 3000);
-      } else {
-        console.warn('[testVideoConnection] Token quota endpoint returned:', response.status);
-        // Try testing video creation endpoint as fallback
-        const videoEndpoint = `${baseUrl}/v2/videos/generations`;
-        console.log('[testVideoConnection] Testing video creation endpoint:', videoEndpoint);
+      // 智谱 API 使用不同的端点
+      if (isZhipu) {
+        // 智谱使用 /v4/chat/completions 测试
+        const testEndpoint = `${baseUrl}/chat/completions`;
+        console.log('[testVideoConnection] Testing Zhipu endpoint:', testEndpoint);
         
         const testBody = {
-          model: 'sora-2',
-          prompt: 'test',
-          aspect_ratio: '16:9',
-          duration: 10
+          model: 'glm-4-flash',
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 10
         };
         
-        const videoResponse = await fetch(videoEndpoint, {
+        const response = await fetch(testEndpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${videoConfig.apiKey}`,
@@ -230,16 +230,42 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
           body: JSON.stringify(testBody)
         });
         
-        if (videoResponse.ok || videoResponse.status === 400) {
-          // 400 might mean invalid prompt, but API is reachable
-          console.log('[testVideoConnection] Video endpoint is reachable');
+        if (response.ok) {
+          console.log('[testVideoConnection] Zhipu API test successful');
           setVideoTestStatus('success');
           setTimeout(() => setVideoTestStatus('idle'), 3000);
-        } else if (videoResponse.status === 401) {
-          console.error('[testVideoConnection] Authentication failed on video endpoint (401)');
+        } else if (response.status === 401) {
+          console.error('[testVideoConnection] Authentication failed (401)');
           setVideoTestStatus('failed');
           setTimeout(() => setVideoTestStatus('idle'), 3000);
         } else {
+          console.warn('[testVideoConnection] Zhipu API returned:', response.status);
+          setVideoTestStatus('failed');
+          setTimeout(() => setVideoTestStatus('idle'), 3000);
+        }
+      } else {
+        // 其他 API（神马等）使用原有逻辑
+        const tokenQueryUrl = `${baseUrl}/v1/token/quota`;
+        console.log('[testVideoConnection] Testing token quota endpoint:', tokenQueryUrl);
+        
+        const response = await fetch(tokenQueryUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${videoConfig.apiKey}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[testVideoConnection] Token quota response:', data);
+          setVideoTestStatus('success');
+          setTimeout(() => setVideoTestStatus('idle'), 3000);
+        } else if (response.status === 401) {
+          console.error('[testVideoConnection] Authentication failed (401)');
+          setVideoTestStatus('failed');
+          setTimeout(() => setVideoTestStatus('idle'), 3000);
+        } else {
+          console.warn('[testVideoConnection] Token quota endpoint returned:', response.status);
           setVideoTestStatus('failed');
           setTimeout(() => setVideoTestStatus('idle'), 3000);
         }
@@ -248,7 +274,6 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
       // CORS errors are expected for browser-based API calls
       console.warn('[testVideoConnection] CORS or network error (expected for browser-based API calls):', e);
       // Treat CORS errors as "success" since the API key format is valid
-      // The actual API will work when called from a backend or with proper CORS headers
       setVideoTestStatus('success');
       setTimeout(() => setVideoTestStatus('idle'), 3000);
     }
@@ -482,9 +507,11 @@ const KeySelection: React.FC<KeySelectionProps> = ({ onSuccess, lang, theme = 'd
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const selectedProvider = VIDEO_PROVIDERS.find(p => p.id === e.target.value);
                   if (selectedProvider) {
+                    // Normalize provider ID to match VideoAPIProvider type
+                    const normalizedProvider = e.target.value === 'dayangyu' ? 'dyu' : e.target.value;
                     setVideoConfig({
                       ...videoConfig,
-                      provider: e.target.value as any,
+                      provider: normalizedProvider as any,
                       baseUrl: selectedProvider.baseUrl
                     });
                   }

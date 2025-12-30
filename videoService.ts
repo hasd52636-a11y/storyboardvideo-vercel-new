@@ -7,10 +7,12 @@ import {
   StoryboardShot,
   StoryboardOptions,
   Character,
-  CreateCharacterOptions
+  CreateCharacterOptions,
+  VideoAPIProvider
 } from './types';
+import ZhipuService from './zhipuService';
 
-export type VideoAPIProvider = 'openai' | 'dyu' | 'shenma';
+export type { VideoAPIProvider };
 
 export interface VideoServiceConfigWithProvider extends VideoServiceConfig {
   provider?: VideoAPIProvider;
@@ -35,14 +37,37 @@ class VideoService {
   }
 
   private buildHeaders(contentType: string = 'application/json'): HeadersInit {
+    // 确保所有请求头都只包含 ASCII 字符，避免 fetch 编码问题
+    const apiKey = this.config.apiKey || '';
+    
+    // 验证 API Key 是否包含非 ASCII 字符
+    if (!/^[\x00-\x7F]*$/.test(apiKey)) {
+      console.warn('[VideoService] API Key contains non-ASCII characters, filtering...');
+      // 过滤掉非 ASCII 字符
+      const cleanApiKey = apiKey.replace(/[^\x00-\x7F]/g, '');
+      if (!cleanApiKey) {
+        throw new Error('API Key contains only non-ASCII characters');
+      }
+      return {
+        'Authorization': `Bearer ${cleanApiKey}`,
+        'Content-Type': contentType
+      };
+    }
+
     return {
-      'Authorization': `Bearer ${this.config.apiKey}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': contentType
     };
   }
 
   private getOpenAIEndpoint(action: string): string {
-    const baseUrl = this.config.baseUrl.replace(/\/$/, '');
+    // For OpenAI Sora and compatible APIs (Shenma, etc.)
+    // Use the baseUrl as-is, just append the correct endpoint path
+    let baseUrl = this.config.baseUrl.replace(/\/$/, '');
+    
+    // Remove any /v4 or /v1 suffix if present to avoid duplication
+    baseUrl = baseUrl.replace(/\/v[0-9]+$/, '');
+    
     switch (action) {
       case 'create':
         return `${baseUrl}/v2/videos/generations`;
@@ -88,6 +113,19 @@ class VideoService {
     }
   }
 
+  private getZhipuEndpoint(action: string): string {
+    // 智谱 API 使用固定的基础 URL
+    switch (action) {
+      case 'create':
+        return 'https://open.bigmodel.cn/api/paas/v4/videos/generations';
+      case 'status':
+        // 智谱使用 /async-result/{taskId} 查询异步任务结果
+        return 'https://open.bigmodel.cn/api/paas/v4/async-result';
+      default:
+        return 'https://open.bigmodel.cn/api/paas/v4';
+    }
+  }
+
   async createVideo(
     prompt: string,
     options: CreateVideoOptions
@@ -98,6 +136,9 @@ class VideoService {
       }
       if (this.provider === 'shenma') {
         return this.createVideoShenma(prompt, options);
+      }
+      if (this.provider === 'zhipu') {
+        return this.createVideoZhipu(prompt, options);
       }
       return this.createVideoOpenAI(prompt, options);
     } catch (error) {
@@ -124,6 +165,11 @@ class VideoService {
 
     if (options.images && options.images.length > 0) {
       body.images = options.images;
+    }
+
+    // 处理参考图像
+    if (options.reference_image) {
+      body.images = [options.reference_image];
     }
 
     if (options.notify_hook) {
@@ -238,6 +284,37 @@ class VideoService {
     return this.createVideoOpenAI(prompt, options);
   }
 
+  private async createVideoZhipu(
+    prompt: string,
+    options: CreateVideoOptions
+  ): Promise<{ task_id: string; status: string; progress: string }> {
+    const zhipuService = new ZhipuService(this.config as any);
+    
+    // 映射尺寸参数
+    const sizeMap: Record<string, any> = {
+      '16:9': '1920x1080',
+      '9:16': '1080x1920',
+      '1:1': '1024x1024'
+    };
+
+    const result = await zhipuService.generateVideo(prompt, {
+      imageUrl: options.reference_image || options.images?.[0],
+      quality: options.hd ? 'quality' : 'speed',
+      withAudio: false,
+      watermarkEnabled: options.watermark ?? true,
+      size: sizeMap[options.aspect_ratio || '16:9'] || '1920x1080',
+      fps: 30,
+      duration: (options.duration as 5 | 10) || 5,
+      userId: 'default_user'
+    });
+
+    return {
+      task_id: result.taskId,
+      status: result.status,
+      progress: '0%'
+    };
+  }
+
   async getVideoStatus(taskId: string): Promise<VideoStatus> {
     try {
       if (this.provider === 'dyu') {
@@ -245,6 +322,9 @@ class VideoService {
       }
       if (this.provider === 'shenma') {
         return this.getVideoStatusShenma(taskId);
+      }
+      if (this.provider === 'zhipu') {
+        return this.getVideoStatusZhipu(taskId);
       }
       return this.getVideoStatusOpenAI(taskId);
     } catch (error) {
@@ -256,12 +336,9 @@ class VideoService {
   private async getVideoStatusOpenAI(taskId: string): Promise<VideoStatus> {
     const endpoint = `${this.getOpenAIEndpoint('status')}/${taskId}`;
 
-    const myHeaders = new Headers();
-    myHeaders.append('Authorization', `Bearer ${this.config.apiKey}`);
-
     const requestOptions = {
       method: 'GET',
-      headers: myHeaders,
+      headers: this.buildHeaders(),
       redirect: 'follow' as RequestRedirect
     };
 
@@ -291,12 +368,9 @@ class VideoService {
   private async getVideoStatusDYU(taskId: string): Promise<VideoStatus> {
     const endpoint = `${this.getDYUEndpoint('status')}/${taskId}`;
 
-    const myHeaders = new Headers();
-    myHeaders.append('Authorization', `Bearer ${this.config.apiKey}`);
-
     const requestOptions = {
       method: 'GET',
-      headers: myHeaders,
+      headers: this.buildHeaders(),
       redirect: 'follow' as RequestRedirect
     };
 
@@ -338,6 +412,37 @@ class VideoService {
     // 神马 API 支持 OpenAI 兼容的 /v2/videos/generations 端点
     // 使用 OpenAI 格式进行状态查询
     return this.getVideoStatusOpenAI(taskId);
+  }
+
+  private async getVideoStatusZhipu(taskId: string): Promise<VideoStatus> {
+    const zhipuService = new ZhipuService(this.config as any);
+    const result = await zhipuService.getVideoStatus(taskId);
+
+    // 映射智谱状态到统一的 VideoStatus 格式
+    const statusMap: Record<string, string> = {
+      'PROCESSING': 'IN_PROGRESS',
+      'SUCCESS': 'SUCCESS',
+      'FAIL': 'FAILURE'
+    };
+
+    // 计算进度：根据状态返回合理的进度值
+    let progress = '0%';
+    if (result.status === 'SUCCESS') {
+      progress = '100%';
+    } else if (result.status === 'PROCESSING') {
+      // 处理中：显示动态进度（30-90%）
+      progress = '30%';
+    } else if (result.status === 'FAIL') {
+      progress = '0%';
+    }
+
+    return {
+      task_id: taskId,
+      status: statusMap[result.status] as any || 'IN_PROGRESS',
+      progress: progress,
+      video_url: result.videoUrl,
+      fail_reason: result.error
+    };
   }
 
   async getTokenQuota(): Promise<TokenQuota> {
@@ -589,19 +694,21 @@ class VideoService {
     onProgress: (status: VideoStatus) => void,
     onComplete: (videoUrl: string) => void,
     onError: (error: Error) => void,
-    timeoutMs: number = 60 * 60 * 1000  // 改为 60 分钟，支持多分镜视频
+    timeoutMs: number = 60 * 60 * 1000  // 60 分钟超时
   ): void {
-    let pollInterval = 5000;  // 改为 5 秒，避免过于频繁的请求
-    const maxInterval = 30000;  // 改为 30 秒
-    const backoffMultiplier = 1.5;  // 改为 1.5，更平缓的增长
+    let pollInterval = 3000;  // 初始 3 秒
+    const maxInterval = 15000;  // 最大 15 秒
+    const backoffMultiplier = 1.2;  // 更温和的增长
     const startTime = Date.now();
-    let retryCount = 0;
+    let pollCount = 0;
 
     const poll = async () => {
+      pollCount++;
       try {
         // 检查超时
         const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
         if (Date.now() - startTime > timeoutMs) {
+          console.error(`[Video Polling] Timeout after ${elapsedSeconds}s`);
           onError(new Error(`Video generation timeout (exceeded ${timeoutMs / 60 / 1000} minutes)`));
           this.stopPolling(taskId);
           return;
@@ -610,14 +717,16 @@ class VideoService {
         const status = await this.getVideoStatus(taskId);
         
         // 添加详细日志
-        console.log(`[Video Polling] Task: ${taskId}`);
+        console.log(`[Video Polling #${pollCount}] Task: ${taskId}`);
         console.log(`  Status: ${status.status}`);
         console.log(`  Progress: ${status.progress}`);
-        console.log(`  Elapsed: ${elapsedSeconds}s / ${timeoutMs / 1000}s`);
+        console.log(`  Elapsed: ${elapsedSeconds}s`);
+        console.log(`  Next poll in: ${Math.round(pollInterval / 1000)}s`);
         
         onProgress(status);
 
         if (status.status === 'SUCCESS') {
+          console.log(`[Video Polling] ✅ SUCCESS after ${elapsedSeconds}s and ${pollCount} polls`);
           if (status.video_url) {
             onComplete(status.video_url);
           } else {
@@ -625,6 +734,7 @@ class VideoService {
           }
           this.stopPolling(taskId);
         } else if (status.status === 'FAILURE') {
+          console.error(`[Video Polling] ❌ FAILURE after ${elapsedSeconds}s`);
           // 区分不同的失败原因
           let errorMessage = status.fail_reason || status.error?.message || 'Video generation failed';
           
@@ -640,18 +750,19 @@ class VideoService {
           onError(new Error(errorMessage));
           this.stopPolling(taskId);
         } else {
-          // 增加轮询间隔（指数退避）
+          // 增加轮询间隔（指数退避，但更温和）
           pollInterval = Math.min(pollInterval * backoffMultiplier, maxInterval);
-          retryCount++;
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        console.error('[Video Polling] Error:', error);
         onError(error as Error);
         this.stopPolling(taskId);
       }
     };
 
+    // 立即执行第一次轮询
     poll();
+    // 然后设置定时轮询
     const intervalId = setInterval(poll, pollInterval);
     this.pollingIntervals.set(taskId, intervalId);
   }

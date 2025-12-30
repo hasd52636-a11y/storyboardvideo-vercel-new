@@ -53,7 +53,7 @@ const SidebarLeft: React.FC<SidebarLeftProps> = ({ theme, lang, activeTool, setA
         ))}
       </div>
       <div className={`h-[2px] w-8 ${theme === 'dark' ? 'bg-white/10' : 'bg-zinc-100'}`}></div>
-      
+
       <div className="relative" ref={menuRef}>
         <button 
           onClick={() => setShowImportMenu(!showImportMenu)} 

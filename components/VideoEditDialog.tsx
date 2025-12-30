@@ -7,6 +7,8 @@ interface VideoEditDialogProps {
   onCancel: () => void;
   lang?: 'zh' | 'en';
   isLoading?: boolean;
+  symbols?: Array<{ name: string }>;
+  symbolDescriptions?: Record<string, Record<string, string>>;
 }
 
 export default function VideoEditDialog({
@@ -14,7 +16,9 @@ export default function VideoEditDialog({
   onEdit,
   onCancel,
   lang = 'zh',
-  isLoading = false
+  isLoading = false,
+  symbols = [],
+  symbolDescriptions = {}
 }: VideoEditDialogProps) {
   const [editedPrompt, setEditedPrompt] = useState(video.prompt);
 
@@ -89,6 +93,32 @@ export default function VideoEditDialog({
           </div>
         )}
 
+        {/* Video Prompt Preview */}
+        {video.videoPrompt && (
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+              {lang === 'zh' ? '视频提示词预览' : 'Video Prompt Preview'}
+            </label>
+            <div
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+                backgroundColor: '#f9f9f9',
+                color: '#333',
+                lineHeight: '1.5',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}
+            >
+              {video.videoPrompt}
+            </div>
+          </div>
+        )}
+
         {/* Prompt Editor */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
@@ -120,6 +150,46 @@ export default function VideoEditDialog({
         <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
           {lang === 'zh' ? '修改提示词后，点击"重新生成"将使用新的提示词重新生成视频。' : 'After modifying the prompt, click "Regenerate" to regenerate the video with the new prompt.'}
         </div>
+
+        {/* 符号库信息显示 - 这些信息已经被追加到提示词中，会直接发送给视频模型 */}
+        {symbols && symbols.length > 0 && (
+          <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#e8f5e9', borderRadius: '4px', border: '1px solid #4CAF50' }}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#2e7d32', marginBottom: '8px' }}>
+              {lang === 'zh' ? '✓ 分镜上标记的镜头运动' : '✓ Marked Camera Movements'}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {symbols.map((symbol, idx) => {
+                const symbolName = symbol.name;
+                const descriptions = symbolDescriptions || {};
+                const langDescriptions = descriptions[lang] || descriptions['en'] || {};
+                const description = langDescriptions[symbolName] || symbolName;
+                
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: '6px 10px',
+                      backgroundColor: '#fff',
+                      borderRadius: '3px',
+                      border: '1px solid #4CAF50',
+                      fontSize: '12px',
+                      color: '#2e7d32',
+                      display: 'inline-block'
+                    }}
+                    title={description}
+                  >
+                    {description}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#555', marginTop: '8px' }}>
+              {lang === 'zh' 
+                ? '💡 这些符号描述已被追加到提示词中。如果你修改了提示词，请确保保留这些描述以获得最佳效果' 
+                : '💡 These symbol descriptions have been added to the prompt. If you modify the prompt, please keep these descriptions for best results'}
+            </div>
+          </div>
+        )}
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '10px' }}>

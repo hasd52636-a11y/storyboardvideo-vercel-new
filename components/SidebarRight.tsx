@@ -887,6 +887,20 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                     </div>
                   )}
                 </div>
+                <div className="space-y-2 px-4 py-3 flex-shrink-0 border-t" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : '#e5e7eb' }}>
+                  {/* Frame Count Selector */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-black uppercase opacity-50">
+                      <span>{lang === 'zh' ? '分镜数' : 'Frame Count'}</span>
+                      <span>{chatFrameCount}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setChatFrameCount(Math.max(1, chatFrameCount - 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>−</button>
+                      <input type="number" min="1" max="16" value={chatFrameCount} onChange={e => setChatFrameCount(Math.max(1, Math.min(16, Number(e.target.value))))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold border text-center outline-none ${theme === 'dark' ? 'bg-white/5 border-white/10 text-white' : 'bg-zinc-50 border-zinc-300 text-black'}`} />
+                      <button onClick={() => setChatFrameCount(Math.min(16, chatFrameCount + 1))} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${theme === 'dark' ? 'bg-white/5 border border-white/10 hover:border-purple-500/50' : 'bg-zinc-50 border border-zinc-300 hover:border-purple-500'}`}>+</button>
+                    </div>
+                  </div>
+                </div>
                 <div className="flex gap-2 px-4 pb-4 flex-shrink-0">
                   <button 
                     onClick={() => handleGenerateStoryboard()} 

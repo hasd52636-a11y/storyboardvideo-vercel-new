@@ -24,27 +24,27 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
   const [showEditPrompt, setShowEditPrompt] = useState(false);
   const [editPrompt, setEditPrompt] = useState(item.prompt);
   const [showQuickStoryboardSubmenu, setShowQuickStoryboardSubmenu] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = I18N[lang];
 
-  // Resize handle disabled to prevent interference with file upload
-  // const handleResizeStart = (e: React.MouseEvent) => {
-  //   e.stopPropagation();
-  //   e.preventDefault();
-  //   setIsResizing(true);
-  //   const startX = e.clientX;
-  //   const startY = e.clientY;
-  //   const startW = item.width;
-  //   const ratio = item.height / item.width;
-  //   const onMouseMove = (me: MouseEvent) => {
-  //     const nw = Math.max(120, startW + (me.clientX - startX));
-  //     const nh = nw * ratio;
-  //     onAction(item.id, 'resize', { width: nw, height: nh });
-  //   };
-  //   const onMouseUp = () => { setIsResizing(false); window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
-  //   window.addEventListener('mousemove', onMouseMove);
-  //   window.addEventListener('mouseup', onMouseUp);
-  // };
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = item.width;
+    const ratio = item.height / item.width;
+    const onMouseMove = (me: MouseEvent) => {
+      const nw = Math.max(120, startW + (me.clientX - startX));
+      const nh = nw * ratio;
+      onAction(item.id, 'resize', { width: nw, height: nh });
+    };
+    const onMouseUp = () => { setIsResizing(false); window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp); };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   const handleDragOverQuickAction = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -68,7 +68,24 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
         onDropSymbol(item.id, e.dataTransfer.getData('symbolName'), ((e.clientX - rect.left)/rect.width)*100, ((e.clientY - rect.top)/rect.height)*100);
       }}>
       
-      <input type="file" ref={fileInputRef} onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => onAction(item.id, 'replace', ev.target?.result); r.readAsDataURL(f); } }} className="hidden" accept="image/*" style={{ display: 'none' }} />
+      <input type="file" ref={fileInputRef} onChange={e => { 
+        const f = e.target.files?.[0]; 
+        if (f) { 
+          const r = new FileReader(); 
+          r.onload = ev => {
+            const dataUrl = ev.target?.result as string;
+            // 获取图片原始尺寸以保持原比例
+            const img = new Image();
+            img.onload = () => {
+              const originalRatio = img.naturalHeight / img.naturalWidth;
+              const newHeight = item.width * originalRatio;
+              onAction(item.id, 'replace', { imageUrl: dataUrl, width: item.width, height: newHeight });
+            };
+            img.src = dataUrl;
+          }; 
+          r.readAsDataURL(f); 
+        } 
+      }} className="hidden" accept="image/*" style={{ display: 'none' }} />
       
       {item.isMain && (
         <div className="absolute -top-10 left-0 flex items-center gap-2 pointer-events-none">
@@ -96,27 +113,34 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
             {item.symbols.map(s => <div key={s.id} className="absolute text-purple-500 font-black text-3xl drop-shadow-md" style={{ left: `${s.x}%`, top: `${s.y}%`, transform: 'translate(-50%, -50%)' }}>{s.label}</div>)}
           </div>
         )}
-        {/* Resize handle removed to prevent interference with file upload */}
+        {/* Resize handle - bottom-right corner */}
+        <div 
+          onMouseDown={handleResizeStart}
+          className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-tl-lg cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ pointerEvents: 'auto' }}
+        />
       </div>
 
       {showMenu && (
-        <div className="fixed inset-0 z-[200]" onClick={() => { setShowMenu(false); setShowQuickStoryboardSubmenu(false); }}>
+        <div className="fixed inset-0 z-[200]" onClick={() => { setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} style={{ pointerEvents: 'auto' }}>
           <div 
             className={`p-2 border rounded-2xl shadow-2xl w-40 flex flex-col font-black text-[10px] uppercase tracking-widest ${theme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-600 shadow-zinc-300/50'}`} 
             style={{
               position: 'fixed',
               left: `${Math.max(10, Math.min(menuPos.x, window.innerWidth - 170))}px`,
               top: `${Math.max(10, Math.min(menuPos.y, window.innerHeight - 300))}px`,
-              zIndex: 201
-            }}>
+              zIndex: 201,
+              pointerEvents: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}>
             <button onClick={() => { onAction(item.id, 'setMain'); setShowMenu(false); }} className="p-3 text-left hover:text-red-500 transition-all">{t.setKey}</button>
             <button onClick={() => { fileInputRef.current?.click(); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.replace}</button>
             {!item.isMain && selectedCount && selectedCount > 1 ? (
               <button onClick={() => { onShowBatchRedrawDialog?.(); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{lang === 'zh' ? `批量重绘 (${selectedCount}张)` : `Batch Redraw (${selectedCount})`}</button>
             ) : (
-              !item.isMain && <button onClick={() => { setEditPrompt(item.prompt); setShowEditPrompt(true); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.redrawViewScript}</button>
+              !item.isMain && <button onClick={() => { setEditPrompt((item as any).visualPrompt || item.prompt); setShowEditPrompt(true); setShowMenu(false); }} className="p-3 text-left hover:text-purple-500 transition-all">{t.redrawViewScript}</button>
             )}
-            {false && !item.isMain && (
+            {!item.isMain && (
               <div className="relative" onMouseEnter={() => setShowQuickStoryboardSubmenu(true)} onMouseLeave={() => setShowQuickStoryboardSubmenu(false)}>
                 <button 
                   onClick={() => setShowQuickStoryboardSubmenu(!showQuickStoryboardSubmenu)}
@@ -126,7 +150,7 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
                   <span className="text-xs">▶</span>
                 </button>
                 {showQuickStoryboardSubmenu && (
-                  <div className={`absolute left-full top-0 ml-1 border rounded-xl shadow-2xl w-40 flex flex-col font-black text-[10px] uppercase tracking-widest z-[9999] pointer-events-auto ${theme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-600'}`}>
+                  <div className={`absolute left-full top-0 ml-1 border rounded-xl shadow-2xl w-40 flex flex-col font-black text-[10px] uppercase tracking-widest z-[9999] pointer-events-auto ${theme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-400' : 'bg-white border-zinc-200 text-zinc-600'}`} onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => { onQuickAction?.(item.id, 'three-view'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '三视图' : 'Three-View'}</button>
                     <button onClick={() => { onQuickAction?.(item.id, 'multi-grid'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多角度' : 'Multi-Grid'}</button>
                     <button onClick={() => { onQuickAction?.(item.id, 'style-comparison'); setShowMenu(false); setShowQuickStoryboardSubmenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '多风格' : 'Style Comparison'}</button>
@@ -135,7 +159,7 @@ const StoryboardCard: React.FC<StoryboardCardProps> = ({ item, theme, isSelected
                 )}
               </div>
             )}
-            <button onClick={() => { onAction(item.id, 'copy'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{t.copy}</button>
+            <button onClick={() => { onAction(item.id, 'copy'); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">{lang === 'zh' ? '复制图片' : 'Duplicate'}</button>
             {onExportJPEG && <button onClick={() => { onExportJPEG(); setShowMenu(false); }} className="p-3 text-left hover:text-green-500 transition-all">{t.downloadImage}</button>}
             {!item.isMain && onGenerateVideo && <button onClick={() => { onGenerateVideo(); setShowMenu(false); }} className="p-3 text-left hover:text-blue-500 transition-all">🎬 {lang === 'zh' ? '生成视频' : 'Generate Video'}</button>}
             <button onClick={() => { onAction(item.id, 'delete'); setShowMenu(false); }} className="p-3 text-left text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all">{t.delete}</button>

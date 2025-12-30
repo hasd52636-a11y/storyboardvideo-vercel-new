@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import VideoService, { VideoAPIProvider } from '../videoService';
+import { ZHIPU_MODEL_GROUPS, getDefaultZhipuModels, getModelDisplayName, getModelDescription } from '../zhipuModels';
 
 interface APIConfigDialogProps {
   onConfigured: (config: { baseUrl: string; apiKey: string; provider: VideoAPIProvider }) => void;
@@ -9,7 +10,8 @@ interface APIConfigDialogProps {
 const DEFAULT_URLS: Record<VideoAPIProvider, string> = {
   openai: 'https://api.openai.com',
   dyu: 'https://api.dyuapi.com',
-  shenma: 'https://api.whatai.cc'
+  shenma: 'https://api.whatai.cc',
+  zhipu: 'https://open.bigmodel.cn'
 };
 
 const PROVIDER_INFO: Record<VideoAPIProvider, { name: string; color: string; description: string; getKeyUrl: string }> = {
@@ -30,6 +32,12 @@ const PROVIDER_INFO: Record<VideoAPIProvider, { name: string; color: string; des
     color: '#FF9800',
     description: '✅ 图生视频，已测试通过',
     getKeyUrl: 'https://api.whatai.cc'
+  },
+  zhipu: {
+    name: '智谱 GLM (推荐)',
+    color: '#6366f1',
+    description: '✅ 多模态分析 + 视频生成',
+    getKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys'
   }
 };
 
@@ -45,6 +53,13 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [testResult, setTestResult] = useState<{ quota: number; remaining: number } | null>(null);
+
+  // 智谱模型配置
+  const [showModelConfig, setShowModelConfig] = useState(false);
+  const [zhipuModels, setZhipuModels] = useState(() => {
+    const saved = localStorage.getItem('zhipu_models_config');
+    return saved ? JSON.parse(saved) : getDefaultZhipuModels();
+  });
 
   // 当提供商改变时，自动加载该提供商的 API Key
   useEffect(() => {
@@ -80,6 +95,11 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
       localStorage.setItem('video_api_provider', provider);
       localStorage.setItem(`sora_base_url_${provider}`, baseUrl);
       localStorage.setItem(`sora_api_key_${provider}`, apiKey);
+
+      // 如果是智谱，保存模型配置
+      if (provider === 'zhipu') {
+        localStorage.setItem('zhipu_models_config', JSON.stringify(zhipuModels));
+      }
 
       onConfigured({ baseUrl, apiKey, provider });
 
@@ -150,7 +170,7 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
             📍 第 1 步：选择服务商
           </p>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {(['openai', 'dyu', 'shenma'] as const).map((p) => (
+            {(['openai', 'dyu', 'shenma', 'zhipu'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setProvider(p)}
@@ -356,6 +376,105 @@ export default function APIConfigDialog({ onConfigured, isOpen }: APIConfigDialo
             <li>可以随时更换或删除</li>
           </ul>
         </div>
+
+        {/* 智谱模型配置 */}
+        {provider === 'zhipu' && success && (
+          <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #eee' }}>
+            <button
+              onClick={() => setShowModelConfig(!showModelConfig)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#f0f0f0',
+                color: '#333',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#e0e0e0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f0f0f0';
+              }}
+            >
+              {showModelConfig ? '▼' : '▶'} 🤖 配置模型 (可选)
+            </button>
+
+            {showModelConfig && (
+              <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '6px' }}>
+                <p style={{ fontSize: '12px', color: '#666', margin: '0 0 12px 0' }}>
+                  选择默认使用的模型（普惠模型系列推荐）
+                </p>
+
+                {ZHIPU_MODEL_GROUPS.map((group) => (
+                  <div key={group.labelZh} style={{ marginBottom: '16px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#333', margin: '0 0 8px 0' }}>
+                      {group.labelZh}
+                    </p>
+                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 8px 0' }}>
+                      {group.descriptionZh}
+                    </p>
+
+                    {group.models.map((model) => (
+                      <div key={model.id} style={{ marginBottom: '8px' }}>
+                        <select
+                          value={zhipuModels[model.category] || model.id}
+                          onChange={(e) => {
+                            setZhipuModels({
+                              ...zhipuModels,
+                              [model.category]: e.target.value
+                            });
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            backgroundColor: '#fff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value={model.id}>
+                            {model.nameZh} ({model.costLevel === 'low' ? '💰 低成本' : '💎 高质量'})
+                          </option>
+                        </select>
+                        <p style={{ fontSize: '11px', color: '#999', margin: '4px 0 0 0' }}>
+                          {model.descriptionZh}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => {
+                    localStorage.setItem('zhipu_models_config', JSON.stringify(zhipuModels));
+                    setShowModelConfig(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: '#6366f1',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    marginTop: '12px'
+                  }}
+                >
+                  ✅ 保存模型配置
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

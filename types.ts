@@ -14,12 +14,17 @@ export enum ToolType {
 
 export type ModelProvider = 'gemini' | 'openai' | 'zhipu' | 'qianwen' | 'deepseek' | 'custom' | 'banana' | 'veo';
 
+export type VideoAPIProvider = 'openai' | 'dyu' | 'shenma' | 'zhipu';
+
 export interface ProviderConfig {
   provider: ModelProvider;
   apiKey: string;
   baseUrl: string;
   llmModel: string;
   imageModel: string;
+  videoModel?: string;
+  visionModel?: string;
+  thinkingModel?: string;
 }
 
 export interface StoryboardSymbol {
@@ -49,6 +54,10 @@ export interface StoryboardItem {
   colorMode?: 'color' | 'blackAndWhite';
   aspectRatio?: string;
   isLoading?: boolean;
+  videoPrompt?: string;
+  videoPromptEn?: string;
+  visualPrompt?: string;
+  visualPromptEn?: string;
 }
 
 // 工具函数：将比例字符串转换为数字
@@ -76,6 +85,7 @@ export interface ScriptScene {
   index: number;
   description: string;
   visualPrompt: string;
+  videoPrompt?: string;
 }
 
 export interface ChatMessage {
@@ -85,12 +95,13 @@ export interface ChatMessage {
 }
 
 export interface ImageAttachmentState {
-  file: File | null;
-  preview: string; // base64 or URL
-  dimensions: { width: number; height: number } | null;
-  fileSize: number; // in bytes
+  files: File[];
+  previews: string[]; // base64 or URLs
+  dimensions: Array<{ width: number; height: number } | null>;
+  fileSizes: number[]; // in bytes
   isLoading: boolean;
   error: string | null;
+  currentIndex?: number; // for carousel navigation
 }
 
 export interface ImageMetadata {
@@ -121,6 +132,7 @@ export interface VideoItem {
   id: string;
   taskId: string;
   prompt: string;
+  videoPrompt?: string;
   status: 'loading' | 'completed' | 'failed';
   progress: number;
   videoUrl?: string;
@@ -130,6 +142,28 @@ export interface VideoItem {
   width: number;
   height: number;
   createdAt: number;
+  downloadPath?: string;
+}
+
+export interface BatchScript {
+  id: string;
+  title: string;
+  content: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  videoUrl?: string;
+  error?: string;
+}
+
+export interface BatchConfig {
+  videoDuration: number;  // 10-25 秒
+  processingInterval: number;  // 5 分钟 ~ 12 小时（毫秒）
+  aspectRatio: string;  // 16:9, 9:16, 1:1, 4:3
+  referenceImageUrl?: string;  // 参考图片 URL
+  downloadPath?: string;  // 下载目录
+  maxRetries?: number;
+  retryDelay?: number;
+  enableNotifications?: boolean;
 }
 
 // Video Service Types
@@ -180,6 +214,7 @@ export interface CreateVideoOptions {
   duration?: 10 | 15 | 25;
   hd?: boolean;
   images?: string[];
+  reference_image?: string;
   notify_hook?: string;
   watermark?: boolean;
   private?: boolean;
