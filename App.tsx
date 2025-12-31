@@ -677,6 +677,15 @@ const App: React.FC = () => {
     if (!scenes || scenes.length === 0) return;
     
     try {
+      // 检查API配置
+      const savedConfig = localStorage.getItem('director_canvas_api_config');
+      if (!savedConfig) {
+        alert(lang === 'zh' 
+          ? '❌ 未配置API，请先在设置中配置API Key' 
+          : '❌ API not configured. Please configure API Key in settings first');
+        return;
+      }
+      
       const startOrder = items.length;
       const isBlackAndWhite = globalColorMode === 'blackAndWhite';
       
@@ -785,16 +794,26 @@ const App: React.FC = () => {
                 'success'
               );
             } else {
-              throw new Error('No image URL returned');
+              throw new Error(lang === 'zh' ? '未获得图片URL' : 'No image URL returned');
             }
           } catch (error) {
             console.error(`[handleGenerateFromManualScenes] Failed to generate image for scene ${sceneIndex + 1}:`, error);
             
+            // 更新卡片状态为失败
+            setItems(prev => prev.map(item =>
+              item.id === placeholderItem.id
+                ? {
+                    ...item,
+                    isLoading: false
+                  }
+                : item
+            ));
+            
             showCanvasNotification(
               placeholderItem.id,
               lang === 'zh' 
-                ? `❌ 场景 ${sceneIndex + 1} 生成失败` 
-                : `❌ Scene ${sceneIndex + 1} failed`,
+                ? `❌ 场景 ${sceneIndex + 1} 生成失败: ${error instanceof Error ? error.message : String(error)}` 
+                : `❌ Scene ${sceneIndex + 1} failed: ${error instanceof Error ? error.message : String(error)}`,
               'error'
             );
           }
@@ -3088,7 +3107,8 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
         onOpenManualSceneDialog={() => setShowManualSceneDialog(true)}
         selectedCount={selectedIds.size}
         currentSymbols={getAllSelectedSymbols()}
-        symbolDescriptions={SYMBOL_DESCRIPTIONS} />
+        symbolDescriptions={SYMBOL_DESCRIPTIONS}
+        selectedItems={items.filter(item => selectedIds.has(item.id))} />
 
       {showSettings && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">

@@ -38,8 +38,7 @@ export default function VideoGenDialog({
 }: VideoGenDialogProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [visualPrompt, setVisualPrompt] = useState('');
-  const [videoPrompt, setVideoPrompt] = useState('');
+  const [videoPrompt, setVideoPrompt] = useState('全局指令：参考锁定视频中出现的所有角色或产品，必须严格以提供的参考图中的主体为唯一视觉来源，确保身份、外形、比例、服饰、材质及风格完全一致。不得对参考主体进行任何形式的重新设计、替换、风格化、美化或修改。人物面部、身形、服装、纹理、标识、颜色及轮廓需与参考图完全一致。若提示词与参考图存在冲突，参考图优先级始终高于提示词。\n\n');
   const [model, setModel] = useState<'sora-2' | 'sora-2-pro' | 'cogvideox-flash' | 'cogvideox-3'>('sora-2');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [duration, setDuration] = useState(10);
@@ -47,7 +46,7 @@ export default function VideoGenDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [batchPrompts, setBatchPrompts] = useState<string[]>([]);
-  const [intervalMinutes, setIntervalMinutes] = useState(5);
+  const [intervalMinutes, setIntervalMinutes] = useState(2);
   const [language, setLanguage] = useState('');
   const [downloadPath, setDownloadPath] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -112,22 +111,22 @@ export default function VideoGenDialog({
   };
 
   const handleGenerate = async () => {
-    // 合并画面提示词和视频提示词
-    const combinedPrompt = `${visualPrompt}\n${videoPrompt}`.trim();
+    // 使用单一的视频提示词
+    const finalPrompt = videoPrompt.trim();
 
-    if (!combinedPrompt) {
-      alert(lang === 'zh' ? '请输入画面提示词或视频提示词' : 'Please enter visual or video prompt');
+    if (!finalPrompt) {
+      alert(lang === 'zh' ? '请输入视频提示词' : 'Please enter video prompt');
       return;
     }
 
-    if (combinedPrompt.length > 760) {
-      alert(lang === 'zh' ? '提示词总长度不能超过760个字符' : 'Total prompt length cannot exceed 760 characters');
+    if (finalPrompt.length > 2000) {
+      alert(lang === 'zh' ? '提示词长度不能超过2000个字符' : 'Prompt length cannot exceed 2000 characters');
       return;
     }
 
     setIsLoading(true);
     try {
-      await onGenerate(combinedPrompt, {
+      await onGenerate(finalPrompt, {
         model,
         aspect_ratio: aspectRatio,
         duration,
@@ -320,7 +319,7 @@ export default function VideoGenDialog({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <input
                   type="range"
-                  min="5"
+                  min="2"
                   max="60"
                   value={intervalMinutes}
                   onChange={(e) => setIntervalMinutes(Number(e.target.value))}
@@ -350,35 +349,8 @@ export default function VideoGenDialog({
             </div>
           </div>
         ) : (
-          /* 单个模式：两个提示词输入框 */
+          /* 单个模式：单一视频提示词输入框 */
           <div style={{ marginBottom: '20px' }}>
-            {/* 画面提示词 */}
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-                {lang === 'zh' ? '画面提示词' : 'Visual Prompt'}
-              </label>
-              <textarea
-                value={visualPrompt}
-                onChange={(e) => setVisualPrompt(e.target.value.slice(0, 380))}
-                placeholder={lang === 'zh' ? '描述画面的视觉内容、场景、人物等...' : 'Describe visual content, scene, characters, etc...'}
-                style={{
-                  width: '100%',
-                  height: '80px',
-                  padding: '10px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Arial, sans-serif',
-                  backgroundColor: '#fff',
-                  cursor: 'text'
-                }}
-              />
-              <div style={{ marginTop: '4px', fontSize: '12px', color: visualPrompt.length > 350 ? '#ff6b6b' : '#999' }}>
-                {visualPrompt.length} / 380
-              </div>
-            </div>
-
             {/* 视频提示词 */}
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
@@ -387,13 +359,13 @@ export default function VideoGenDialog({
               </label>
               <textarea
                 value={videoPrompt}
-                onChange={(e) => setVideoPrompt(e.target.value.slice(0, 380))}
+                onChange={(e) => setVideoPrompt(e.target.value.slice(0, 2000))}
                 placeholder={selectedFrames.length > 0 
-                  ? (lang === 'zh' ? '描述视频中的动作、效果、镜头运动等...' : 'Describe actions, effects, camera movements, etc...')
-                  : (lang === 'zh' ? '描述视频的动作、效果、音乐等...' : 'Describe video actions, effects, music, etc...')}
+                  ? (lang === 'zh' ? '描述视频的画面、动作、效果、镜头运动等...' : 'Describe video visuals, actions, effects, camera movements, etc...')
+                  : (lang === 'zh' ? '描述视频的画面、动作、效果、音乐等...' : 'Describe video visuals, actions, effects, music, etc...')}
                 style={{
                   width: '100%',
-                  height: '80px',
+                  height: '200px',
                   padding: '10px',
                   border: '1px solid #ddd',
                   borderRadius: '4px',
@@ -401,11 +373,12 @@ export default function VideoGenDialog({
                   boxSizing: 'border-box',
                   fontFamily: 'Arial, sans-serif',
                   backgroundColor: '#fff',
-                  cursor: 'text'
+                  cursor: 'text',
+                  resize: 'vertical'
                 }}
               />
-              <div style={{ marginTop: '4px', fontSize: '12px', color: videoPrompt.length > 350 ? '#ff6b6b' : '#999' }}>
-                {videoPrompt.length} / 380
+              <div style={{ marginTop: '4px', fontSize: '12px', color: videoPrompt.length > 1800 ? '#ff6b6b' : '#999' }}>
+                {videoPrompt.length} / 2000
               </div>
             </div>
           </div>
@@ -494,15 +467,15 @@ export default function VideoGenDialog({
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <button
             onClick={isBatchMode ? handleGenerateBatch : handleGenerate}
-            disabled={isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !(visualPrompt.trim() || videoPrompt.trim()))}
+            disabled={isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !videoPrompt.trim())}
             style={{
               flex: 1,
               padding: '10px',
-              backgroundColor: isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !(visualPrompt.trim() || videoPrompt.trim())) ? '#ccc' : '#4CAF50',
+              backgroundColor: isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !videoPrompt.trim()) ? '#ccc' : '#4CAF50',
               color: '#fff',
               border: 'none',
               borderRadius: '4px',
-              cursor: isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !(visualPrompt.trim() || videoPrompt.trim())) ? 'not-allowed' : 'pointer',
+              cursor: isLoading || (isBatchMode ? (batchPrompts.length === 0 || exceedsLimit) : !videoPrompt.trim()) ? 'not-allowed' : 'pointer',
               fontSize: '14px',
               fontWeight: 'bold'
             }}

@@ -17,7 +17,10 @@ export default function VideoWindow({
   onDragStart
 }: VideoWindowProps) {
   const [isHovering, setIsHovering] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const getStatusColor = () => {
     switch (item.status) {
@@ -42,6 +45,45 @@ export default function VideoWindow({
         return '生成失败';
       default:
         return '未知状态';
+    }
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    let errorMessage = '视频加载失败';
+    
+    if (video.error) {
+      switch (video.error.code) {
+        case video.error.MEDIA_ERR_ABORTED:
+          errorMessage = '视频加载被中止';
+          break;
+        case video.error.MEDIA_ERR_NETWORK:
+          errorMessage = '网络错误，无法加载视频';
+          break;
+        case video.error.MEDIA_ERR_DECODE:
+          errorMessage = '视频解码失败，可能是格式不支持';
+          break;
+        case video.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          errorMessage = '浏览器不支持该视频格式';
+          break;
+      }
+    }
+    
+    setVideoError(errorMessage);
+    setIsVideoLoading(false);
+    console.error('Video playback error:', errorMessage);
+    console.error('Video URL:', item.videoUrl);
+  };
+
+  const handleVideoLoadedMetadata = () => {
+    setIsVideoLoading(false);
+    setVideoError(null);
+    console.log('Video loaded successfully:', item.videoUrl);
+  };
+
+  const handleOpenInNewTab = () => {
+    if (item.videoUrl) {
+      window.open(item.videoUrl, '_blank');
     }
   };
 
@@ -145,8 +187,9 @@ export default function VideoWindow({
         )}
 
         {/* 完成状态 - 显示视频 */}
-        {item.status === 'completed' && item.videoUrl && (
+        {item.status === 'completed' && item.videoUrl && !videoError && (
           <video
+            ref={videoRef}
             src={item.videoUrl}
             controls
             controlsList="nodownload"
@@ -158,14 +201,45 @@ export default function VideoWindow({
               objectFit: 'contain',
               backgroundColor: '#000'
             }}
-            onError={(e) => {
-              console.error('Video playback error:', e);
-              console.error('Video URL:', item.videoUrl);
-            }}
-            onLoadedMetadata={() => {
-              console.log('Video loaded successfully:', item.videoUrl);
-            }}
+            onError={handleVideoError}
+            onLoadedMetadata={handleVideoLoadedMetadata}
           />
+        )}
+
+        {/* 视频加载中 */}
+        {item.status === 'completed' && item.videoUrl && isVideoLoading && !videoError && (
+          <div style={{ textAlign: 'center', color: '#666' }}>
+            <div style={{ fontSize: '14px', marginBottom: '10px' }}>
+              ⏳ 视频加载中...
+            </div>
+          </div>
+        )}
+
+        {/* 视频播放错误 */}
+        {item.status === 'completed' && videoError && (
+          <div style={{ textAlign: 'center', color: '#f44336', padding: '10px' }}>
+            <div style={{ fontSize: '12px', marginBottom: '10px' }}>
+              ⚠️ {videoError}
+            </div>
+            <button
+              onClick={handleOpenInNewTab}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                backgroundColor: '#2196F3',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginBottom: '5px'
+              }}
+            >
+              在新标签页打开
+            </button>
+            <div style={{ fontSize: '11px', color: '#999', marginTop: '5px' }}>
+              URL: {item.videoUrl?.substring(0, 50)}...
+            </div>
+          </div>
         )}
 
         {/* 失败状态 */}

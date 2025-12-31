@@ -16,6 +16,35 @@ interface ManualSceneInputDialogProps {
   onMinimize?: (isMinimized: boolean) => void;
 }
 
+/**
+ * 解析批量输入文本，提取场景信息
+ * @param input - 批量输入文本
+ * @returns 解析后的场景数组
+ */
+function parseScenes(input: string): Scene[] {
+  // 正则表达式：匹配 <<<...>>> 及其后的内容
+  // 使用非贪心匹配确保正确分割场景
+  const sceneRegex = /<<<([\s\S]*?)>>>([\s\S]*?)(?=<<<|$)/g;
+  const matches = Array.from(input.matchAll(sceneRegex));
+  
+  if (matches.length === 0) {
+    return [];
+  }
+
+  const scenes: Scene[] = matches.map((match, index) => {
+    const visualPrompt = match[1].trim();
+    const videoPrompt = match[2].trim();
+    
+    return {
+      id: String(index + 1),
+      visualPrompt: visualPrompt,
+      videoPrompt: videoPrompt && videoPrompt.length > 0 ? videoPrompt : undefined
+    };
+  }).filter(scene => scene.visualPrompt.length > 0);
+
+  return scenes;
+}
+
 const ManualSceneInputDialog: React.FC<ManualSceneInputDialogProps> = ({
   isOpen,
   onClose,
@@ -48,11 +77,11 @@ const ManualSceneInputDialog: React.FC<ManualSceneInputDialogProps> = ({
       deleteConfirm: '确定删除此画面吗？',
       batchMode: '批量输入',
       singleMode: '单个输入',
-      batchPlaceholder: '使用 <<< 和 >>> 标记分隔每个场景\n\n示例：\n<<<\n场景1的描述\n>>>\n\n<<<\n场景2的描述\n>>>',
+      batchPlaceholder: '使用 <<< 和 >>> 标记分隔每个场景\n\n示例：\n<<<\n场景1的描述\n>>>\n场景1的视频提示词\n\n<<<\n场景2的描述\n>>>\n场景2的视频提示词',
       parseBatch: '解析',
       parseSuccess: '成功解析 {count} 个场景',
       parseError: '未找到有效的场景标记',
-      formatGuide: '格式：使用 <<< 和 >>> 标记分隔场景',
+      formatGuide: '格式：在 <<< 和 >>> 之间输入画面提示词，在 >>> 之后输入视频提示词（可选）',
       batchGenerate: '批量生成',
       interval: '间隔时间',
       intervalMs: '毫秒',
@@ -70,11 +99,11 @@ const ManualSceneInputDialog: React.FC<ManualSceneInputDialogProps> = ({
       deleteConfirm: 'Delete this scene?',
       batchMode: 'Batch Input',
       singleMode: 'Single Input',
-      batchPlaceholder: 'Use <<< and >>> to separate scenes\n\nExample:\n<<<\nScene 1 description\n>>>\n\n<<<\nScene 2 description\n>>>',
+      batchPlaceholder: 'Use <<< and >>> to separate scenes\n\nExample:\n<<<\nScene 1 description\n>>>\nScene 1 video prompt\n\n<<<\nScene 2 description\n>>>\nScene 2 video prompt',
       parseBatch: 'Parse',
       parseSuccess: 'Successfully parsed {count} scenes',
       parseError: 'No valid scene markers found',
-      formatGuide: 'Format: Use <<< and >>> to separate scenes',
+      formatGuide: 'Format: Enter visual prompt between <<< and >>>, enter video prompt after >>> (optional)',
       batchGenerate: 'Batch Generate',
       interval: 'Interval',
       intervalMs: 'ms',
@@ -105,37 +134,31 @@ const ManualSceneInputDialog: React.FC<ManualSceneInputDialogProps> = ({
       ? `<<<
 场景1的画面描述
 >>>
-
-场景1的视频提示词
+场景1的视频提示词（可选）
 
 <<<
 场景2的画面描述
 >>>
-
-场景2的视频提示词
+场景2的视频提示词（可选）
 
 <<<
 场景3的画面描述
 >>>
-
-场景3的视频提示词`
+场景3的视频提示词（可选）`
       : `<<<
 Scene 1 visual description
 >>>
-
-Scene 1 video prompt
+Scene 1 video prompt (optional)
 
 <<<
 Scene 2 visual description
 >>>
-
-Scene 2 video prompt
+Scene 2 video prompt (optional)
 
 <<<
 Scene 3 visual description
 >>>
-
-Scene 3 video prompt`;
+Scene 3 video prompt (optional)`;
 
     const element = document.createElement('a');
     const file = new Blob([template], { type: 'text/plain' });
@@ -156,64 +179,35 @@ Scene 3 video prompt`;
       const content = event.target?.result as string;
       setBatchInput(content);
       
-      // 自动解析 - 分开的格式
-      const sceneRegex = /<<<([\s\S]*?)>>>\s*([\s\S]*?)(?=<<<|$)/g;
-      const matches = Array.from(content.matchAll(sceneRegex));
-      
-      if (matches.length > 0) {
-        const parsedScenes: Scene[] = matches.map((match, index) => {
-          const visualPrompt = match[1].trim();
-          const videoPrompt = match[2].trim();
-          
-          return {
-            id: String(index + 1),
-            visualPrompt: visualPrompt,
-            videoPrompt: videoPrompt && videoPrompt.length > 0 ? videoPrompt : undefined
-          };
-        }).filter(scene => scene.visualPrompt.length > 0);
+      const parsedScenes = parseScenes(content);
 
-        if (parsedScenes.length > 0) {
-          setScenes(parsedScenes);
-          // 自动切换到单个模式显示导入的场景
-          setIsBatchMode(false);
-          setBatchInput(''); // 清空批量输入框
-          alert(lang === 'zh' 
-            ? `成功导入 ${parsedScenes.length} 个场景，已切换到单个编辑模式` 
-            : `Successfully imported ${parsedScenes.length} scenes, switched to single edit mode`);
-        }
+      if (parsedScenes.length > 0) {
+        setScenes(parsedScenes);
+        setIsBatchMode(false);
+        setBatchInput('');
+        alert(lang === 'zh' 
+          ? `成功导入 ${parsedScenes.length} 个场景，已切换到单个编辑模式` 
+          : `Successfully imported ${parsedScenes.length} scenes, switched to single edit mode`);
       }
     };
     reader.readAsText(file);
     
-    // 重置 input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const handleParseBatch = () => {
-    const sceneRegex = /<<<([\s\S]*?)>>>/g;
-    const matches = Array.from(batchInput.matchAll(sceneRegex));
+    const parsedScenes = parseScenes(batchInput);
     
-    if (matches.length === 0) {
+    if (parsedScenes.length === 0) {
       alert(lang === 'zh' ? '未找到有效的场景标记' : 'No valid scene markers found');
       return;
     }
 
-    const parsedScenes: Scene[] = matches.map((match, index) => ({
-      id: String(index + 1),
-      visualPrompt: match[1].trim()
-    })).filter(scene => scene.visualPrompt.length > 0);
-
-    if (parsedScenes.length === 0) {
-      alert(lang === 'zh' ? '未找到有效的场景内容' : 'No valid scene content found');
-      return;
-    }
-
     setScenes(parsedScenes);
-    // 自动切换到单个模式，显示导入的场景
     setIsBatchMode(false);
-    setBatchInput(''); // 清空批量输入框
+    setBatchInput('');
     alert(lang === 'zh' 
       ? `成功解析 ${parsedScenes.length} 个场景，已切换到单个编辑模式` 
       : `Successfully parsed ${parsedScenes.length} scenes, switched to single edit mode`);
@@ -605,22 +599,10 @@ Scene 3 video prompt`;
               </button>
               <button
                 onClick={() => {
-                  // 直接生成，不切换模式
-                  const sceneRegex = /<<<([\s\S]*?)>>>/g;
-                  const matches = Array.from(batchInput.matchAll(sceneRegex));
+                  const parsedScenes = parseScenes(batchInput);
                   
-                  if (matches.length === 0) {
-                    alert(lang === 'zh' ? '未找到有效的场景标记' : 'No valid scene markers found');
-                    return;
-                  }
-
-                  const parsedScenes: Scene[] = matches.map((match, index) => ({
-                    id: String(index + 1),
-                    visualPrompt: match[1].trim()
-                  })).filter(scene => scene.visualPrompt.length > 0);
-
                   if (parsedScenes.length === 0) {
-                    alert(lang === 'zh' ? '未找到有效的场景内容' : 'No valid scene content found');
+                    alert(lang === 'zh' ? '未找到有效的场景标记' : 'No valid scene markers found');
                     return;
                   }
 

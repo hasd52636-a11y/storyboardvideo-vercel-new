@@ -6,6 +6,7 @@ import StyleSelector from './StyleSelector';
 import { useHelpAssistant } from './HelpAssistant';
 import { validateImageFile, generateImagePreview, getImageMetadata, convertImageForAPI } from '../lib/image-utils';
 import ScreenshotCaptureService from '../services/ScreenshotCaptureService';
+import VideoPromptPreviewDialog from './VideoPromptPreviewDialog';
 
 interface SidebarRightProps {
   lang: Language;
@@ -30,10 +31,11 @@ interface SidebarRightProps {
   selectedCount?: number;
   currentSymbols?: Array<{ name: string }>;
   symbolDescriptions?: Record<string, Record<string, string>>;
+  selectedItems?: StoryboardItem[];
 }
 
 const SidebarRight: React.FC<SidebarRightProps> = ({ 
-  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, onGenerateScriptPreview, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, onOpenManualSceneDialog, selectedCount, currentSymbols = [], symbolDescriptions = {}
+  lang, theme, isLoading, isExpanded, setIsExpanded, onGenerateFromScript, onExportPrompts, onExportJPEG, getFormattedPrompts, model, setModel, onGenerateFromDialogue, onGenerateScriptPreview, globalColorMode, onOpenHelp, onStyleChange, onAspectRatioChange, onGenerateVideo, onOpenManualSceneDialog, selectedCount, currentSymbols = [], symbolDescriptions = {}, selectedItems = []
 }) => {
   const [activeTab, setActiveTab] = useState<'scriptCreation' | 'videoEdit'>('scriptCreation');
   const [chatInput, setChatInput] = useState('');
@@ -41,6 +43,9 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showChatGuide, setShowChatGuide] = useState(true);
   const [isHelpMode, setIsHelpMode] = useState(false);
+  const [showVideoPromptPreview, setShowVideoPromptPreview] = useState(false);
+  const [globalInstruction, setGlobalInstruction] = useState('');
+  const [selectedRule, setSelectedRule] = useState<'rule1' | 'rule2' | 'rule3' | null>(null);
   
   // Script creation mode - for image generation
   const [scriptStyle, setScriptStyle] = useState<StyleOption | null>(null);
@@ -277,11 +282,154 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     console.log('[handleSendChat] Text:', text.substring(0, 50));
     console.log('[handleSendChat] Attached images:', attachedImage.previews.length);
     console.log('[handleSendChat] Is screenshot analysis:', isScreenshotAnalysis);
+    console.log('[handleSendChat] Selected rule:', selectedRule);
+    
+    // 构建最终的消息文本（包含规则）
+    let finalText = text;
+    
+    // 规则1：一键脚本
+    const rule1 = `########################### SORA 2 GLOBAL PROMPT RULES##########################
+1. GLOBAL REFERENCE LOCK:
+All characters or products shown in this video must strictly use the main subject from the provided reference image(s) as the only visual source of identity, appearance, proportions, clothing, materials, and style. Do not redesign, replace, stylize, beautify, or alter the reference subject in any way. Preserve face, body, outfit, texture, logo, color, and silhouette exactly as in the reference. If any conflict exists between the prompt and the reference image, the reference image always overrides the prompt.
+
+2. MULTI-CUT SHOTS & DYNAMIC CAMERA:
+- Use multiple cuts per scene to tell a cinematic story.
+- Include wide shots, close-ups, over-the-shoulder, tracking shots, and dynamic effects like motion blur or tilt.
+- Each cut must be short (≤10 seconds) and visually clear.
+
+3. INLINE CHARACTER DESCRIPTIONS & DIALOGUE:
+- Every time a character speaks or appears, include inline description in parentheses: distinctive look, wardrobe, position, and current emotion.
+- Camera must focus on the speaking character using proper framing (close-up or medium shot).
+- Character mouth movements must be perfectly synchronized with dialogue.
+- Do not create separate character description sections.
+- Dialogue order must remain exactly as in the script.
+- Example format:
+CharacterName (appearance, outfit, position; emotion): "Dialogue line." (camera instructions; lip-sync)
+
+4. BGM, SFX & PACING:
+- BGM: match scene emotion, adjust intensity dynamically between dialogue and silent beats.
+- SFX: include realistic environmental and action sounds, precisely synced with on-screen actions.
+- Pacing: keep each scene ≤10s, maintain cinematic rhythm with sharp cuts or smooth transitions, end with visual or emotional hook.
+
+5. DIALOGUE ORDER LOCK:
+- At the end of each scene, specify dialogue order as:
+Dialogue_order_lock=[Character1, Character2, Character3,...]
+
+6. ZERO NARRATION & CHARACTER LIMITS:
+- No narration in any scene; dialogue only.
+- Maintain natural dialogue flow and continuity.
+- Each scene prompt: minimum 700 characters, maximum 1000 characters.`;
+
+    // 规则2：反推提示词
+    const rule2 = `请根据以下参考图像生成用于图像生成模型的 prompt，严格包含所有细节描述和约束条件：
+
+【主体】
+主体对象：___
+主体细节：___（性别/年龄/种类/姿态/动作）
+脸部/表情：___
+服饰/装饰/配件具体描述：___
+皮肤/材质质感：___
+动作精确描述：___（如正在做什么）
+
+【背景】
+背景场景类型：___（室内/室外/环境）
+远/近景物体：___
+具体元素位置：___（如左前方、右后方、地平线位置）
+环境细节：___（天气、时间、自然/人工元素）
+
+【构图与视角】
+视角：___（仰视/俯视/平视）
+构图方式：___（居中/对称/三分法/黄金分割）
+镜头：___（广角/长焦/微距）
+主体与画面比例：___
+
+【光线与颜色】
+主光源方向：___
+光线类型与强度：___
+阴影与高光：___
+整体色调：___（暖/冷/对比/单色）
+
+【纹理与材质】
+表面质感：___（光泽/哑光/粗糙/细腻）
+反射/折射/透明度：___
+特定材质细节：___
+
+【氛围与情绪】
+整体情绪：___（如忧郁/欢快/紧张）
+氛围效果：___（烟雾/雾霾/雨滴/粒子）
+
+【风格与艺术性】
+指定风格：___（如超写实/油画/赛博朋克/水彩）
+艺术家风格参考：___（如参考 XX 风格）
+
+【摄影参数约束】
+相机型号或模拟镜头：___
+光圈：___
+快门速度：___
+景深描述：___
+画面清晰度：___
+
+【生成参数】
+分辨率：___（如 4K / 8K / 指定宽高比）
+种子（Seed）：___（整数）
+模型版本：___
+渲染/采样设置：___（如 steps/CFG scale）
+
+【负面约束（必须排除）】
+排除内容：
+- 不要出现 ___
+- 不要出现 ___
+- 不要出现 ___
+
+输出格式要求（严格 prompt 形式，不含解释）：
+<最终生成 prompt>`;
+
+    // 规则3：产品宣传
+    const rule3 = `为 [产品名称] 生成产品宣传视频，电影商业风格。
+
+【第一镜头】
+- 宽幅建立镜头，将 [产品名称] 置于干净、现代背景前。
+- 摄像机缓慢推进，柔和光线配合细微阴影。
+- 屏显文字突出宣传语："[强化产品宣传语1]"。
+- 声音：轻快的环境音乐。
+
+【第二镜头】
+- 产品细节特写：展示材质、表面处理、纹理等。
+- 摄像机围绕产品进行平稳 45° 环绕拍摄。
+- 光线采用高对比主光与柔和补光。
+- 旁白/叙述强调卖点："[核心卖点1 强化版]"。
+
+【第三镜头】
+- 现实使用场景：[目标受众] 自然使用 [产品名称]，体现使用价值。
+- 摄像机跟随动作拍摄。
+- 场景环境明亮、积极、富有生活气息。
+- 旁白/叙述强调用户利益："[核心卖点2 与用户利益强化版]"。
+
+【第四镜头】
+- 品牌 Logo 和强化宣传语画面。
+- 摄像机平滑拉远，并略带暗角效果。
+- 屏显文字突出行动号召与宣传语："[强化产品宣传语2]"。
+- 音乐提升至振奋效果。
+
+【技术要求】
+- 清晰的主体描述、光线方向及镜头动作提示
+- 平滑的摄像机移动与镜头过渡
+- 情绪基调：积极、现代、专业
+- 可选音效：轻柔点击声、环境过渡声`;
+
+    // 根据选中的规则添加到消息中
+    if (selectedRule === 'rule1') {
+      finalText = `${rule1}\n\n用户输入：\n${text}`;
+    } else if (selectedRule === 'rule2') {
+      finalText = `${rule2}\n\n用户输入：\n${text}`;
+    } else if (selectedRule === 'rule3') {
+      finalText = `${rule3}\n\n用户输入：\n${text}`;
+    }
     
     // Create user message with optional images
     const userMessage: ChatMessage = { 
       role: 'user', 
-      text,
+      text: finalText,
       images: attachedImage.previews.length > 0 ? attachedImage.previews : undefined
     };
     
@@ -294,6 +442,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
     const history = [...chatHistory, userMessage];
     setChatHistory(history);
     setChatInput('');
+    setSelectedRule(null); // 发送后清除规则选择
     
     // Store images before clearing
     const imagesToSend = attachedImage.previews.length > 0 ? [...attachedImage.previews] : [];
@@ -317,7 +466,7 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
           return;
         }
         
-        const systemContext = buildAIPrompt(text, lang);
+        const systemContext = buildAIPrompt(finalText, lang);
         const messagesWithContext = [
           { role: 'user', parts: [{ text: systemContext }] }
         ];
@@ -463,6 +612,34 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                         <input type="range" min="5" max="120" step="5" value={scriptDuration} onChange={e => setScriptDuration(Number(e.target.value))} className="w-full accent-purple-600 h-1" />
                       </div>
                     </div>
+                  </div>
+                </section>
+
+                {/* Video Prompt Preview Section */}
+                <section className="space-y-3 pt-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest opacity-50">{lang === 'zh' ? '视频提示词预览' : 'Video Prompt Preview'}</h3>
+                  <div className={`p-4 rounded-2xl border space-y-3 ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
+                    {selectedCount && selectedCount > 0 ? (
+                      <div className="space-y-3">
+                        <p className={`text-[10px] font-bold ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                          {lang === 'zh' ? `已选择 ${selectedCount} 个分镜` : `${selectedCount} frame(s) selected`}
+                        </p>
+                        <button
+                          onClick={() => setShowVideoPromptPreview(true)}
+                          className={`w-full px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                            theme === 'dark'
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'bg-blue-500 hover:bg-blue-600 text-white'
+                          }`}
+                        >
+                          {lang === 'zh' ? '📋 查看视频提示词' : '📋 View Video Prompts'}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className={`text-[10px] font-bold opacity-50 ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                        {lang === 'zh' ? '选择分镜以查看视频提示词' : 'Select frames to view video prompts'}
+                      </p>
+                    )}
                   </div>
                 </section>
 
@@ -744,6 +921,55 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
                   {isChatLoading && <div className="text-[10px] uppercase font-black text-purple-500 animate-pulse">{lang === 'zh' ? '思考中...' : 'Thinking...'}</div>}
                 </div>
                 <div className={`flex flex-col gap-2 border-t px-4 py-3 flex-shrink-0 relative ${theme === 'dark' ? 'border-white/5' : 'border-zinc-100'}`}>
+                  {/* 预制规则按钮 */}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => setSelectedRule(selectedRule === 'rule1' ? null : 'rule1')}
+                      className={`flex-1 min-w-[120px] px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                        selectedRule === 'rule1'
+                          ? theme === 'dark'
+                            ? 'bg-green-600 text-white shadow-lg shadow-green-500/50'
+                            : 'bg-green-500 text-white shadow-lg shadow-green-400/50'
+                          : theme === 'dark'
+                          ? 'bg-white/5 border border-white/10 text-white/70 hover:border-green-500/50 hover:text-green-400'
+                          : 'bg-zinc-100 border border-zinc-300 text-zinc-700 hover:border-green-500 hover:text-green-600'
+                      }`}
+                      title={lang === 'zh' ? '一键脚本规则' : 'One-Click Script Rules'}
+                    >
+                      {lang === 'zh' ? '📝 一键脚本' : '📝 Script'}
+                    </button>
+                    <button
+                      onClick={() => setSelectedRule(selectedRule === 'rule2' ? null : 'rule2')}
+                      className={`flex-1 min-w-[120px] px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                        selectedRule === 'rule2'
+                          ? theme === 'dark'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50'
+                            : 'bg-blue-500 text-white shadow-lg shadow-blue-400/50'
+                          : theme === 'dark'
+                          ? 'bg-white/5 border border-white/10 text-white/70 hover:border-blue-500/50 hover:text-blue-400'
+                          : 'bg-zinc-100 border border-zinc-300 text-zinc-700 hover:border-blue-500 hover:text-blue-600'
+                      }`}
+                      title={lang === 'zh' ? '反推提示词规则' : 'Reverse Prompt Rules'}
+                    >
+                      {lang === 'zh' ? '🔍 反推提示词' : '🔍 Reverse'}
+                    </button>
+                    <button
+                      onClick={() => setSelectedRule(selectedRule === 'rule3' ? null : 'rule3')}
+                      className={`flex-1 min-w-[120px] px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                        selectedRule === 'rule3'
+                          ? theme === 'dark'
+                            ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/50'
+                            : 'bg-orange-500 text-white shadow-lg shadow-orange-400/50'
+                          : theme === 'dark'
+                          ? 'bg-white/5 border border-white/10 text-white/70 hover:border-orange-500/50 hover:text-orange-400'
+                          : 'bg-zinc-100 border border-zinc-300 text-zinc-700 hover:border-orange-500 hover:text-orange-600'
+                      }`}
+                      title={lang === 'zh' ? '产品宣传规则' : 'Product Promotion Rules'}
+                    >
+                      {lang === 'zh' ? '🎬 产品宣传' : '🎬 Promotion'}
+                    </button>
+                  </div>
+
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
                       <textarea 
@@ -951,6 +1177,26 @@ const SidebarRight: React.FC<SidebarRightProps> = ({
       {/* Model selector - removed */}
 
       {/* Help Modal - now using shared help from KeySelection */}
+
+      {/* Video Prompt Preview Dialog */}
+      {showVideoPromptPreview && (
+        <VideoPromptPreviewDialog
+          frames={selectedItems.map((item, idx) => ({
+            id: item.id,
+            index: item.order || idx,
+            visualPrompt: item.visualPrompt || item.prompt || '',
+            videoPrompt: item.videoPrompt,
+            imageUrl: item.imageUrl
+          }))}
+          globalInstruction={globalInstruction}
+          lang={lang}
+          theme={theme}
+          onClose={() => setShowVideoPromptPreview(false)}
+          onConfirm={(instruction) => {
+            setGlobalInstruction(instruction);
+          }}
+        />
+      )}
     </div>
   );
 };
