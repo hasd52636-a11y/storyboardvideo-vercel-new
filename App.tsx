@@ -2152,18 +2152,37 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
 
     try {
       setIsLoading(true);
+      
+      // 导入管理器
+      const { default: VideoStatusManager } = await import('./services/VideoStatusManager');
+      const statusManager = new VideoStatusManager();
+      
+      // 为每个提示词创建视频项
+      const videoItems: VideoItem[] = prompts.map((prompt, index) => {
+        const sceneId = `SC-${String(index + 1).padStart(2, '0')}`;
+        return statusManager.createVideoItem(
+          sceneId,
+          prompt,
+          options.videoPrompt || '',
+          options
+        );
+      });
+
+      // 保存初始视频项
+      setVideoItems(videoItems);
       setBatchProgress({ current: 0, total: prompts.length });
       
-      // 为每个脚本生成视频 - 使用完全相同的逻辑，只替换提示词
-      for (let i = 0; i < prompts.length; i++) {
-        let prompt = prompts[i];
+      // 为每个视频生成
+      for (let i = 0; i < videoItems.length; i++) {
+        const videoItem = videoItems[i];
+        let finalPrompt = prompts[i];
         
         // 如果有选定的分镜图，自动添加参考主体提示
         if (selectedFrames && selectedFrames.length > 0) {
           const refPrompt = lang === 'zh' 
             ? '使用参考图作为视频生成的主体人物/产品，保持一致性。'
             : 'Use the reference image as the main character/product in the video, maintaining consistency.';
-          prompt = refPrompt + '\n' + prompt;
+          finalPrompt = refPrompt + '\n' + finalPrompt;
         }
         
         // 如果指定了语言，添加到提示词中
@@ -2171,7 +2190,7 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           const langPrompt = lang === 'zh'
             ? `视频对话和字幕语言：${options.language}。`
             : `Video dialogue and subtitle language: ${options.language}.`;
-          prompt = prompt + '\n' + langPrompt;
+          finalPrompt = finalPrompt + '\n' + langPrompt;
         }
         
         // 如果不是第一个视频，等待指定的间隔时间
@@ -2180,80 +2199,72 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
         
-        // 构建视频生成选项
-        const videoOptions: any = {
-          model: options.model,
-          aspect_ratio: options.aspect_ratio,
-          duration: options.duration,
-          hd: options.hd
-        };
-        
-        // 如果有选定的分镜图，使用第一张作为参考
-        if (selectedFrames && selectedFrames.length > 0) {
-          const refFrame = items.find(it => it.id === selectedFrames[0].id);
-          if (refFrame && refFrame.imageUrl) {
-            videoOptions.reference_image = refFrame.imageUrl;
+        try {
+          // 更新状态为待处理
+          const updatedItem = statusManager.updateVideoItem(videoItem, 'pending');
+          setVideoItems(prev => prev.map(item => item.id === videoItem.id ? updatedItem : item));
+          
+          // 构建视频生成选项
+          const videoOptions: any = {
+            model: options.model,
+            aspect_ratio: options.aspect_ratio,
+            duration: options.duration,
+            hd: options.hd
+          };
+          
+          // 如果有选定的分镜图，使用第一张作为参考
+          if (selectedFrames && selectedFrames.length > 0) {
+            const refFrame = items.find(it => it.id === selectedFrames[0].id);
+            if (refFrame && refFrame.imageUrl) {
+              videoOptions.reference_image = refFrame.imageUrl;
+            }
           }
+          
+          const result = await videoServiceRef.current.createVideo(finalPrompt, videoOptions);
+
+          // 更新状态为生成中
+          const generatingItem = statusManager.markAsGenerating(updatedItem, result.task_id);
+          setVideoItems(prev => prev.map(item => item.id === videoItem.id ? generatingItem : item));
+          
+          // 开始轮询视频状态
+          videoServiceRef.current.startPolling(
+            result.task_id,
+            (status) => {
+              // 更新进度
+              const progressItem = statusManager.updateProgress(generatingItem, status.progress);
+              setVideoItems(prev => prev.map(item => item.taskId === result.task_id ? progressItem : item));
+            },
+            (videoUrl) => {
+              // 标记为成功
+              const successItem = statusManager.markAsSuccess(generatingItem, videoUrl);
+              setVideoItems(prev => prev.map(item => item.id === videoItem.id ? successItem : item));
+              
+              // 如果指定了下载路径，自动下载
+              if (options.downloadPath && videoUrl) {
+                downloadVideo(videoUrl, options.downloadPath, result.task_id);
+              }
+            },
+            (error) => {
+              // 标记为失败
+              const failedItem = statusManager.markAsFailed(generatingItem, error as Error);
+              setVideoItems(prev => prev.map(item => item.id === videoItem.id ? failedItem : item));
+              
+              // 检查是否应该重试
+              if (statusManager.shouldRetry(failedItem)) {
+                console.log(`[Batch] Retrying video ${videoItem.sceneId} (attempt ${(failedItem.retryCount || 0) + 1})`);
+                // 重试逻辑将在下一个循环中处理
+              }
+            }
+          );
+        } catch (error) {
+          // 标记为失败
+          const failedItem = statusManager.markAsFailed(videoItem, error as Error);
+          setVideoItems(prev => prev.map(item => item.id === videoItem.id ? failedItem : item));
+          console.error(`[Batch] Failed to generate video ${videoItem.sceneId}:`, error);
         }
-        
-        const result = await videoServiceRef.current.createVideo(prompt, videoOptions);
-
-        // 添加视频项到画布
-        const newVideoItem: VideoItem = {
-          id: crypto.randomUUID(),
-          taskId: result.task_id,
-          prompt: prompt,
-          status: 'loading',
-          progress: result.progress,
-          x: 100 + Math.random() * 200,
-          y: 100 + Math.random() * 200,
-          width: 400,
-          height: 300,
-          createdAt: Date.now(),
-          downloadPath: options.downloadPath
-        };
-
-        setVideoItems(prev => [...prev, newVideoItem]);
         
         // 更新进度
         setBatchProgress(prev => ({ ...prev, current: i + 1 }));
-
-        // 开始轮询视频状态 - 使用完全相同的逻辑
-        videoServiceRef.current.startPolling(
-          result.task_id,
-          (status) => {
-            setVideoItems(prev => prev.map(item =>
-              item.taskId === result.task_id
-                ? {
-                    ...item,
-                    progress: status.progress,
-                    status: status.status === 'SUCCESS' ? 'completed' : status.status === 'FAILURE' ? 'failed' : 'loading',
-                    videoUrl: status.video_url || item.videoUrl,
-                    error: status.error?.message
-                  }
-                : item
-            ));
-          },
-          (videoUrl) => {
-            setVideoItems(prev => prev.map(item =>
-              item.taskId === result.task_id
-                ? { ...item, status: 'completed', videoUrl: videoUrl || item.videoUrl }
-                : item
-            ));
-            
-            // 如果指定了下载路径，自动下载
-            if (options.downloadPath && videoUrl) {
-              downloadVideo(videoUrl, options.downloadPath, result.task_id);
-            }
-          },
-          (error) => {
-            setVideoItems(prev => prev.map(item =>
-              item.taskId === result.task_id
-                ? { ...item, status: 'failed', error: typeof error === 'string' ? error : error.message }
-                : item
-            ));
-          }
-        );
       }
 
       setShowVideoGenDialog(false);
@@ -2573,15 +2584,92 @@ Single continuous cinematic shot, immersive 360-degree environment, no split-scr
     setVideoItems(prev => prev.filter(item => item.id !== videoId));
   }, []);
 
-  const handleDownloadVideo = useCallback((videoId: string) => {
+  const handleDownloadVideo = useCallback(async (videoId: string) => {
     const videoItem = videoItems.find(item => item.id === videoId);
     if (!videoItem || !videoItem.videoUrl) return;
 
-    const a = document.createElement('a');
-    a.href = videoItem.videoUrl;
-    a.download = `video_${videoItem.taskId}.mp4`;
-    a.click();
-  }, [videoItems]);
+    try {
+      const { default: VideoDownloadManager } = await import('./services/VideoDownloadManager');
+      const downloadManager = new VideoDownloadManager();
+      
+      const sceneId = videoItem.sceneId || videoItem.taskId?.slice(0, 8) || 'video';
+      
+      await downloadManager.downloadVideo(
+        videoItem.videoUrl,
+        sceneId,
+        (progress) => {
+          console.log(`Download progress: ${progress}%`);
+        }
+      );
+      
+      alert(lang === 'zh' ? '✅ 视频下载成功' : '✅ Video downloaded successfully');
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(lang === 'zh' 
+        ? `❌ 下载失败: ${error instanceof Error ? error.message : String(error)}` 
+        : `❌ Download failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [videoItems, lang]);
+
+  const handleRetryVideo = useCallback(async (videoId: string) => {
+    const videoItem = videoItems.find(item => item.id === videoId);
+    if (!videoItem) return;
+
+    try {
+      const { default: VideoStatusManager } = await import('./services/VideoStatusManager');
+      const statusManager = new VideoStatusManager();
+      
+      // 准备重试
+      const retryItem = statusManager.prepareForRetry(videoItem);
+      setVideoItems(prev => prev.map(item => item.id === videoId ? retryItem : item));
+      
+      // 重新生成视频
+      if (!videoServiceRef.current) {
+        const configStr = localStorage.getItem('director_canvas_video_config');
+        if (!configStr) {
+          alert(lang === 'zh' ? '请先配置视频 API' : 'Please configure video API first');
+          return;
+        }
+        const config = JSON.parse(configStr);
+        videoServiceRef.current = new VideoService(config);
+      }
+
+      const videoOptions: any = {
+        model: 'sora-2',
+        aspect_ratio: '16:9',
+        duration: 10,
+        hd: false
+      };
+
+      const result = await videoServiceRef.current.createVideo(videoItem.prompt, videoOptions);
+
+      // 更新为生成中
+      const generatingItem = statusManager.markAsGenerating(retryItem, result.task_id);
+      setVideoItems(prev => prev.map(item => item.id === videoId ? generatingItem : item));
+
+      // 开始轮询
+      videoServiceRef.current.startPolling(
+        result.task_id,
+        (status) => {
+          const progressItem = statusManager.updateProgress(generatingItem, status.progress);
+          setVideoItems(prev => prev.map(item => item.taskId === result.task_id ? progressItem : item));
+        },
+        (videoUrl) => {
+          const successItem = statusManager.markAsSuccess(generatingItem, videoUrl);
+          setVideoItems(prev => prev.map(item => item.id === videoId ? successItem : item));
+        },
+        (error) => {
+          const failedItem = statusManager.markAsFailed(generatingItem, error as Error);
+          setVideoItems(prev => prev.map(item => item.id === videoId ? failedItem : item));
+        }
+      );
+    } catch (error) {
+      console.error('Retry error:', error);
+      alert(lang === 'zh' 
+        ? `❌ 重新生成失败: ${error instanceof Error ? error.message : String(error)}` 
+        : `❌ Retry failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [videoItems, lang, items]);
 
   const handleEditVideo = useCallback((videoId: string) => {
     setEditingVideoId(videoId);

@@ -131,18 +131,26 @@ export interface StyleOption {
 export interface VideoItem {
   id: string;
   taskId: string;
+  sceneId?: string;                    // 场景ID (SC-01, SC-02 等)
   prompt: string;
   videoPrompt?: string;
-  status: 'loading' | 'completed' | 'failed';
+  visualPrompt?: string;               // 画面提示词
+  status: 'loading' | 'completed' | 'failed' | 'pending' | 'generating';
   progress: number;
   videoUrl?: string;
   error?: string;
+  errorMessage?: string;               // 详细错误信息
   x: number;
   y: number;
   width: number;
   height: number;
   createdAt: number;
+  updatedAt?: number;                  // 更新时间
+  completedAt?: number;                // 完成时间
   downloadPath?: string;
+  retryCount?: number;                 // 重试次数
+  maxRetries?: number;                 // 最大重试次数
+  lastRetryAt?: number;                // 最后重试时间
 }
 
 export interface BatchScript {
@@ -153,6 +161,18 @@ export interface BatchScript {
   progress: number;
   videoUrl?: string;
   error?: string;
+}
+
+export interface BatchGenerationState {
+  id: string;                          // 批量生成ID
+  items: VideoItem[];                  // 视频项列表
+  total: number;                       // 总数
+  completed: number;                   // 已完成数
+  failed: number;                      // 失败数
+  pending: number;                     // 待处理数
+  status: 'idle' | 'processing' | 'completed' | 'paused';
+  startedAt?: number;                  // 开始时间
+  completedAt?: number;                // 完成时间
 }
 
 export interface BatchConfig {

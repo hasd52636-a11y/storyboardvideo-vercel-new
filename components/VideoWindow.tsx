@@ -48,6 +48,22 @@ export default function VideoWindow({
     }
   };
 
+  const getStatusIcon = () => {
+    switch (item.status) {
+      case 'completed':
+        return '✓';
+      case 'loading':
+      case 'generating':
+        return '⏳';
+      case 'failed':
+        return '✗';
+      case 'pending':
+        return '⏸';
+      default:
+        return '?';
+    }
+  };
+
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     let errorMessage = '视频加载失败';
@@ -121,9 +137,14 @@ export default function VideoWindow({
           cursor: 'grab'
         }}
       >
-        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
-          视频 #{item.taskId.slice(0, 8)}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: getStatusColor() }}>
+            {getStatusIcon()}
+          </span>
+          <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
+            {item.sceneId || `视频 #${item.taskId.slice(0, 8)}`}
+          </span>
+        </div>
         {item.status === 'completed' && (
           <button
             onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -155,12 +176,15 @@ export default function VideoWindow({
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: '#fafafa',
-          position: 'relative'
+          position: 'relative',
+          padding: '8px',
+          boxSizing: 'border-box',
+          overflow: 'auto'
         }}
       >
         {/* 加载状态 */}
-        {(item.status === 'loading') && (
-          <div style={{ textAlign: 'center' }}>
+        {(item.status === 'loading' || item.status === 'generating') && (
+          <div style={{ textAlign: 'center', width: '100%' }}>
             <div
               style={{
                 width: '80%',
@@ -168,7 +192,8 @@ export default function VideoWindow({
                 backgroundColor: '#eee',
                 borderRadius: '2px',
                 overflow: 'hidden',
-                marginBottom: '10px'
+                marginBottom: '10px',
+                margin: '0 auto 10px'
               }}
             >
               <div
@@ -242,14 +267,32 @@ export default function VideoWindow({
           </div>
         )}
 
+        {/* 待处理状态 - 显示提示词摘要 */}
+        {item.status === 'pending' && (
+          <div style={{ textAlign: 'center', width: '100%', padding: '8px' }}>
+            <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+              ⏸ 待处理
+            </div>
+            <div style={{ fontSize: '11px', color: '#666', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {item.visualPrompt?.substring(0, 100) || item.prompt?.substring(0, 100) || ''}
+              {(item.visualPrompt?.length || 0) > 100 ? '...' : ''}
+            </div>
+          </div>
+        )}
+
         {/* 失败状态 */}
         {item.status === 'failed' && (
-          <div style={{ textAlign: 'center', color: '#f44336' }}>
+          <div style={{ textAlign: 'center', color: '#f44336', padding: '10px' }}>
             <div style={{ fontSize: '14px', marginBottom: '10px' }}>
               ❌ 生成失败
             </div>
+            {item.errorMessage && (
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>
+                {item.errorMessage}
+              </div>
+            )}
             {item.error && (
-              <div style={{ fontSize: '12px', color: '#999' }}>
+              <div style={{ fontSize: '11px', color: '#999' }}>
                 {item.error}
               </div>
             )}
@@ -258,54 +301,103 @@ export default function VideoWindow({
       </div>
 
       {/* 操作按钮 */}
-      {item.status === 'completed' && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '5px',
-            padding: '8px',
-            backgroundColor: '#f5f5f5',
-            borderTop: '1px solid #eee'
-          }}
-        >
-          <button
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.stopPropagation();
-              onDownload(item.id);
-            }}
-            style={{
-              flex: 1,
-              padding: '6px',
-              fontSize: '12px',
-              backgroundColor: '#4CAF50',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            下载
-          </button>
-          <button
-            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-              e.stopPropagation();
-              onDelete(item.id);
-            }}
-            style={{
-              flex: 1,
-              padding: '6px',
-              fontSize: '12px',
-              backgroundColor: '#f44336',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            删除
-          </button>
-        </div>
-      )}
+      <div
+        style={{
+          display: 'flex',
+          gap: '5px',
+          padding: '8px',
+          backgroundColor: '#f5f5f5',
+          borderTop: '1px solid #eee',
+          flexWrap: 'wrap'
+        }}
+      >
+        {item.status === 'completed' && (
+          <>
+            <button
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                onDownload(item.id);
+              }}
+              style={{
+                flex: 1,
+                minWidth: '60px',
+                padding: '6px',
+                fontSize: '12px',
+                backgroundColor: '#4CAF50',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              下载
+            </button>
+            <button
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                onDelete(item.id);
+              }}
+              style={{
+                flex: 1,
+                minWidth: '60px',
+                padding: '6px',
+                fontSize: '12px',
+                backgroundColor: '#f44336',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              删除
+            </button>
+          </>
+        )}
+        {item.status === 'failed' && (
+          <>
+            <button
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                // 触发重新生成事件
+                const event = new CustomEvent('retryVideo', { detail: { videoId: item.id } });
+                window.dispatchEvent(event);
+              }}
+              style={{
+                flex: 1,
+                minWidth: '60px',
+                padding: '6px',
+                fontSize: '12px',
+                backgroundColor: '#2196F3',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              重新生成
+            </button>
+            <button
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+                onDelete(item.id);
+              }}
+              style={{
+                flex: 1,
+                minWidth: '60px',
+                padding: '6px',
+                fontSize: '12px',
+                backgroundColor: '#f44336',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              删除
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
