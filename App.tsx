@@ -46,7 +46,16 @@ const App: React.FC = () => {
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
   
   // Video generation state
-  const [videoItems, setVideoItems] = useState<VideoItem[]>([]);
+  const [videoItems, setVideoItems] = useState<VideoItem[]>(() => {
+    // 从本地存储恢复视频项
+    try {
+      const saved = localStorage.getItem('batch_video_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Failed to load video items from storage:', error);
+      return [];
+    }
+  });
   const [showVideoGenDialog, setShowVideoGenDialog] = useState(false);
   const [showVideoEditDialog, setShowVideoEditDialog] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
@@ -252,6 +261,28 @@ const App: React.FC = () => {
       }
     };
   }, []);
+
+  // 监听视频重试事件
+  useEffect(() => {
+    const handleRetryEvent = (event: any) => {
+      const { videoId } = event.detail;
+      handleRetryVideo(videoId);
+    };
+
+    window.addEventListener('retryVideo', handleRetryEvent);
+    return () => {
+      window.removeEventListener('retryVideo', handleRetryEvent);
+    };
+  }, [handleRetryVideo]);
+
+  // 保存视频项到本地存储
+  useEffect(() => {
+    try {
+      localStorage.setItem('batch_video_items', JSON.stringify(videoItems));
+    } catch (error) {
+      console.error('Failed to save video items to storage:', error);
+    }
+  }, [videoItems]);
 
   const handleGenerateFromScript = useCallback(async (scriptText: string, sceneCount: number, style?: any, aspectRatio?: string, duration?: number) => {
     if (!scriptText.trim()) return;
